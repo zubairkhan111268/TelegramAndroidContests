@@ -81,6 +81,7 @@ public class ViewPagerFixed extends FrameLayout {
 
     private Adapter adapter;
     TabsView tabsView;
+    ScrollSlidingTextTabStrip tabStrip;
 
     ValueAnimator.AnimatorUpdateListener updateTabProgress = new ValueAnimator.AnimatorUpdateListener() {
         @Override
@@ -89,6 +90,9 @@ public class ViewPagerFixed extends FrameLayout {
                 float scrollProgress = Math.abs(viewPages[0].getTranslationX()) / (float) viewPages[0].getMeasuredWidth();
                 if (tabsView != null) {
                     tabsView.selectTab(nextPosition, currentPosition, 1f - scrollProgress);
+                }
+                if(tabStrip!=null){
+                    tabStrip.selectTabWithId(nextPosition, scrollProgress);
                 }
             }
         }
@@ -170,6 +174,50 @@ public class ViewPagerFixed extends FrameLayout {
         return tabsView;
     }
 
+    public ScrollSlidingTextTabStrip createTabStrip(){
+        tabStrip=new ScrollSlidingTextTabStrip(getContext());
+        tabStrip.setDelegate(new ScrollSlidingTextTabStrip.ScrollSlidingTabStripDelegate(){
+            @Override
+            public void onPageSelected(int page, boolean forward) {
+                animatingForward = forward;
+                nextPosition = page;
+                updateViewForIndex(1);
+
+                if (forward) {
+                    viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth());
+                } else {
+                    viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth());
+                }
+            }
+
+            @Override
+            public void onPageScrolled(float progress) {
+                if (progress == 1f) {
+                    if (viewPages[1] != null) {
+                        swapViews();
+                        viewsByType.put(viewTypes[1], viewPages[1]);
+                        removeView(viewPages[1]);
+                        viewPages[0].setTranslationX(0);
+                        viewPages[1] = null;
+                    }
+                    return;
+                }
+                if (viewPages[1] == null) {
+                    return;
+                }
+                if (animatingForward) {
+                    viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth() * (1f - progress));
+                    viewPages[0].setTranslationX(-viewPages[0].getMeasuredWidth() * progress);
+                } else {
+                    viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth() * (1f - progress));
+                    viewPages[0].setTranslationX(viewPages[0].getMeasuredWidth() * progress);
+                }
+            }
+        });
+        fillTabStrip();
+        return tabStrip;
+    }
+
     private void updateViewForIndex(int index) {
         int adapterPosition = index == 0 ? currentPosition : nextPosition;
         if (viewPages[index] == null) {
@@ -216,6 +264,16 @@ public class ViewPagerFixed extends FrameLayout {
         }
     }
 
+    private void fillTabStrip(){
+        if (adapter != null && tabStrip != null) {
+            tabStrip.removeTabs();
+            for (int i = 0; i < adapter.getItemCount(); i++) {
+                tabStrip.addTextTab(adapter.getItemId(i), adapter.getItemTitle(i));
+            }
+            tabStrip.finishAddingTabs();
+        }
+    }
+
     private boolean prepareForMoving(MotionEvent ev, boolean forward) {
         if ((!forward && currentPosition == 0) || (forward && currentPosition == adapter.getItemCount() - 1)) {
             return false;
@@ -228,6 +286,8 @@ public class ViewPagerFixed extends FrameLayout {
         if (tabsView != null) {
             tabsView.setEnabled(false);
         }
+        if(tabStrip!=null)
+            tabStrip.setEnabled(false);
 
         animatingForward = forward;
         nextPosition = currentPosition + (forward ? 1 : -1);
@@ -244,6 +304,8 @@ public class ViewPagerFixed extends FrameLayout {
         if (tabsView != null && tabsView.isAnimatingIndicator()) {
             return false;
         }
+        if(tabStrip!=null && tabStrip.isAnimatingIndicator())
+            return false;
         if (checkTabsAnimationInProgress()) {
             return true;
         }
@@ -264,6 +326,8 @@ public class ViewPagerFixed extends FrameLayout {
         if (tabsView != null && tabsView.animatingIndicator) {
             return false;
         }
+        if(tabStrip!=null && tabStrip.isAnimatingIndicator())
+            return false;
         if (ev != null) {
             if (velocityTracker == null) {
                 velocityTracker = VelocityTracker.obtain();
@@ -321,6 +385,8 @@ public class ViewPagerFixed extends FrameLayout {
                     if (tabsView != null) {
                         tabsView.selectTab(currentPosition, 0, 0);
                     }
+                    if(tabStrip!=null)
+                        tabStrip.selectTabWithId(currentPosition, 0);
                 }
             }
             if (maybeStartTracking && !startedTracking) {
@@ -339,6 +405,8 @@ public class ViewPagerFixed extends FrameLayout {
                 if (tabsView != null) {
                     tabsView.selectTab(nextPosition, currentPosition, 1f - scrollProgress);
                 }
+                if(tabStrip!=null)
+                    tabStrip.selectTabWithId(nextPosition, scrollProgress);
             }
         } else if (ev == null || ev.getPointerId(0) == startedTrackingPointerId && (ev.getAction() == MotionEvent.ACTION_CANCEL || ev.getAction() == MotionEvent.ACTION_UP || ev.getAction() == MotionEvent.ACTION_POINTER_UP)) {
             velocityTracker.computeCurrentVelocity(1000, maximumVelocity);
@@ -440,6 +508,8 @@ public class ViewPagerFixed extends FrameLayout {
                         if (tabsView != null) {
                             tabsView.setEnabled(true);
                         }
+                        if(tabStrip!=null)
+                            tabStrip.setEnabled(true);
                     }
                 });
                 tabsAnimation.start();
@@ -450,6 +520,8 @@ public class ViewPagerFixed extends FrameLayout {
                 if (tabsView != null) {
                     tabsView.setEnabled(true);
                 }
+                if(tabStrip!=null)
+                    tabStrip.setEnabled(true);
             }
             if (velocityTracker != null) {
                 velocityTracker.recycle();

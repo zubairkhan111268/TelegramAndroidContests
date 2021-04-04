@@ -32,6 +32,8 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.firebase.iid.FirebaseInstanceId;
 
+import org.telegram.animcontest.AnimationSettings;
+import org.telegram.animcontest.GLContextHolder;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.ForegroundDetector;
@@ -170,6 +172,9 @@ public class ApplicationLoader extends Application {
         }
 
         WearDataLayerListenerService.updateWatchConnectionState();
+
+        GLContextHolder.getInstance().initAsync();
+        AnimationSettings.load();
     }
 
     public ApplicationLoader() {

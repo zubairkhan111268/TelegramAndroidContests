@@ -24,6 +24,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
+import org.telegram.animcontest.AnimationSettingsFragment;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.FileLog;
@@ -148,7 +149,13 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
 
         if (parentFragment != null && parentFragment.getChatMode() == 0) {
             if (!parentFragment.isThreadChat() && !UserObject.isReplyUser(parentFragment.getCurrentUser())) {
-                setOnClickListener(v -> openProfile(false));
+//                setOnClickListener(v -> openProfile(false));
+				setOnClickListener(new OnClickListener(){
+                    @Override
+                    public void onClick(View view){
+                        parentFragment.presentFragment(new AnimationSettingsFragment());
+                    }
+                });
             }
 
             TLRPC.Chat chat = parentFragment.getCurrentChat();

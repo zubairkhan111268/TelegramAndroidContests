@@ -51,6 +51,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import org.telegram.animcontest.MessageAnimationHelper;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
@@ -391,6 +392,9 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     private Paint attachButtonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float bottomPannelTranslation;
+
+    private boolean needCustomizeDismissAnimation;
+    private MessageAnimationHelper messageAnimationHelper;
 
     private class AttachButton extends FrameLayout {
 
@@ -1690,6 +1694,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         containerView.addView(selectedCountView, LayoutHelper.createFrame(42, 24, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, -8, 9));
     }
 
+    public void setMessageAnimationHelper(MessageAnimationHelper messageAnimationHelper){
+        this.messageAnimationHelper=messageAnimationHelper;
+    }
+
     @Override
     public void show() {
         super.show();
@@ -1741,6 +1749,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         }
         applyCaption();
         buttonPressed = true;
+        needCustomizeDismissAnimation=true;
         delegate.didPressedButton(7, true, notify, scheduleDate);
     }
 
@@ -2843,6 +2852,18 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             AndroidUtilities.hideKeyboard(commentTextView.getEditText());
         }
         super.dismiss();
+    }
+
+    @Override
+    protected boolean beforeDismissAnimationStart(){
+        if(needCustomizeDismissAnimation){
+            needCustomizeDismissAnimation=false;
+            if(messageAnimationHelper!=null){
+                messageAnimationHelper.setupAttachAlertCloseAnimation(currentSheetAnimation);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

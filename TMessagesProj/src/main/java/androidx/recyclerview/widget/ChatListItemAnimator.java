@@ -14,6 +14,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 
+import org.telegram.animcontest.MessageAnimationHelper;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageReceiver;
@@ -46,13 +47,15 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
     private boolean shouldAnimateEnterFromBottom;
     private RecyclerView.ViewHolder greetingsSticker;
     private ChatGreetingsView chatGreetingsView;
+    private MessageAnimationHelper messageAnimationHelper;
 
     private boolean reversePositions;
 
-    public ChatListItemAnimator(ChatActivity activity, RecyclerListView listView) {
+    public ChatListItemAnimator(ChatActivity activity, RecyclerListView listView, MessageAnimationHelper helper) {
         this.activity = activity;
         this.recyclerListView = listView;
         translationInterpolator = CubicBezierInterpolator.DEFAULT;
+        messageAnimationHelper=helper;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             listView.getElevation();
         }
@@ -212,8 +215,10 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
             moves.addAll(mPendingMoves);
             mPendingMoves.clear();
             for (MoveInfo moveInfo : moves) {
-                animateMoveImpl(moveInfo.holder, moveInfo);
+                animateMoveImpl(moveInfo.holder, moveInfo, true);
             }
+            if(messageAnimationHelper!=null)
+                messageAnimationHelper.doneSettingUpListAnimations();
             moves.clear();
         }
 
@@ -272,6 +277,10 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
 
     public void animateAddImpl(final RecyclerView.ViewHolder holder, int addedItemsHeight) {
         final View view = holder.itemView;
+        if(view.hasTransientState()){
+            dispatchAddFinished(holder);
+            return;
+        }
         final ViewPropertyAnimator animation = view.animate();
         mAddAnimations.add(holder);
         view.setTranslationY(addedItemsHeight);
@@ -356,6 +365,10 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
             FileLog.d("animate move");
         }
         final View view = holder.itemView;
+        if(view.hasTransientState()){
+            dispatchMoveFinished(holder);
+            return false;
+        }
         ChatMessageCell chatMessageCell = null;
         if (holder.itemView instanceof ChatMessageCell) {
             chatMessageCell = ((ChatMessageCell) holder.itemView);
@@ -608,7 +621,11 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
     }
 
     @Override
-    protected void animateMoveImpl(RecyclerView.ViewHolder holder, MoveInfo moveInfo) {
+    protected void animateMoveImpl(RecyclerView.ViewHolder holder, MoveInfo moveInfo){
+        animateMoveImpl(holder, moveInfo, false);
+    }
+
+    protected void animateMoveImpl(RecyclerView.ViewHolder holder, MoveInfo moveInfo, boolean forSlideUp) {
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("animate move impl");
         }
@@ -810,6 +827,8 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
                 }
             }
         });
+        if(forSlideUp && messageAnimationHelper!=null)
+            messageAnimationHelper.setupExistingMessagesSlideUpAnimation(animatorSet);
         animatorSet.start();
         animators.put(holder, animatorSet);
     }
@@ -971,7 +990,7 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
             FileLog.d("all animations done");
         }
 
-        recyclerListView.setClipChildren(true);
+//        recyclerListView.setClipChildren(true);
         while (!runOnAnimationsEnd.isEmpty()) {
             runOnAnimationsEnd.remove(0).run();
         }
@@ -1005,6 +1024,8 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
     }
 
     private void restoreTransitionParams(View view) {
+        if(view.hasTransientState())
+            return;
         view.setAlpha(1f);
         view.setScaleX(1f);
         view.setScaleY(1f);
@@ -1185,6 +1206,10 @@ public class ChatListItemAnimator extends DefaultItemAnimator {
             FileLog.d("animate add impl");
         }
         final View view = holder.itemView;
+        if(view.hasTransientState()){
+            dispatchAddFinished(holder);
+            return;
+        }
         mAddAnimations.add(holder);
         if (holder == greetingsSticker) {
             view.setAlpha(1f);

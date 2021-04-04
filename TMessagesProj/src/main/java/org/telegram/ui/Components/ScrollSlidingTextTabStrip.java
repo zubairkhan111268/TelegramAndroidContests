@@ -425,7 +425,7 @@ public class ScrollSlidingTextTabStrip extends HorizontalScrollView {
         if (left < currentScrollX) {
             smoothScrollTo(left, 0);
         } else if (left + width > currentScrollX + getWidth()) {
-            smoothScrollTo(left + width, 0);
+            smoothScrollTo(left + width - getWidth(), 0);
         }
     }
 
@@ -513,6 +513,38 @@ public class ScrollSlidingTextTabStrip extends HorizontalScrollView {
         if (progress >= 1.0f) {
             currentPosition = position;
             selectedTabId = id;
+        }
+    }
+
+    public void selectTabAtPositionWithoutBullshit(int position, float offset){
+        if(offset==0f){
+            TextView child = (TextView) tabsContainer.getChildAt(currentPosition);
+            TextView nextChild = (TextView) tabsContainer.getChildAt(position);
+            child.setTag(unactiveTextColorKey);
+            nextChild.setTag(activeTextColorKey);
+            currentPosition=position;
+            return;
+        }
+        int nextPos=position+1;
+        TextView child = (TextView) tabsContainer.getChildAt(position);
+        TextView nextChild = (TextView) tabsContainer.getChildAt(nextPos);
+        animateIndicatorStartWidth = getChildWidth(child);
+        animateIndicatorStartX = child.getLeft() + (child.getMeasuredWidth() - animateIndicatorStartWidth) / 2;
+        animateIndicatorToWidth = getChildWidth(nextChild);
+        animateIndicatorToX = nextChild.getLeft() + (nextChild.getMeasuredWidth() - animateIndicatorToWidth) / 2;
+        setAnimationProgressInernal(nextChild, child, offset);
+        if(child.getLeft()<getScrollX())
+            scrollToChild(tabsContainer.indexOfChild(child));
+        else
+            scrollToChild(tabsContainer.indexOfChild(nextChild));
+        if(offset<.5f){
+            currentPosition=position;
+            child.setTag(unactiveTextColorKey);
+            nextChild.setTag(activeTextColorKey);
+        }else{
+            currentPosition=nextPos;
+            nextChild.setTag(unactiveTextColorKey);
+            child.setTag(activeTextColorKey);
         }
     }
 

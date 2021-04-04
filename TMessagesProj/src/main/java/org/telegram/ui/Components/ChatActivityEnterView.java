@@ -86,6 +86,7 @@ import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
 import androidx.customview.widget.ExploreByTouchHelper;
 
+import org.telegram.animcontest.MessageAnimationHelper;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
@@ -222,6 +223,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
 
     private Runnable moveToSendStateRunnable;
     boolean messageTransitionIsRunning;
+
+    private MessageAnimationHelper messageAnimationHelper;
 
     private class SeekBarWaveformView extends View {
 
@@ -3311,9 +3314,10 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                         }
                     }
                 });
-                currentTopViewAnimation.setDuration(220);
-                currentTopViewAnimation.setStartDelay(50);
-                currentTopViewAnimation.setInterpolator(CubicBezierInterpolator.DEFAULT);
+//                currentTopViewAnimation.setDuration(220);
+//                currentTopViewAnimation.setStartDelay(50);
+//                currentTopViewAnimation.setInterpolator(CubicBezierInterpolator.DEFAULT);
+                messageAnimationHelper.setupInputDownsizeAnimation(currentTopViewAnimation);
                 currentTopViewAnimation.start();
             } else {
                 topViewEnterProgress = 0f;
@@ -3637,6 +3641,10 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
     public void setWebPage(TLRPC.WebPage webPage, boolean searchWebPages) {
         messageWebPage = webPage;
         messageWebPageSearch = searchWebPages;
+    }
+
+    public boolean hasWebPage(){
+        return messageWebPage!=null;
     }
 
     public boolean isMessageWebPageSearchEnabled() {
@@ -6119,6 +6127,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                     }
                     setStickersExpanded(false, true, false);
                 }
+                if(messageAnimationHelper!=null)
+                    messageAnimationHelper.beforeSendStickerMessage(view, sticker);
                 ChatActivityEnterView.this.onStickerSelected(sticker, query, parent, false, notify, scheduleDate);
                 if ((int) dialog_id == 0 && MessageObject.isGifDocument(sticker)) {
                     accountInstance.getMessagesController().saveGif(parent, sticker);
@@ -6378,7 +6388,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                 return stickersTabOpen && !(!stickersExpanded && messageEditText.length() > 0) && emojiView.areThereAnyStickers() && !waitingForKeyboardOpen;
             }
         });
-        sizeNotifierLayout.addView(emojiView, sizeNotifierLayout.getChildCount() - 1);
+//        sizeNotifierLayout.addView(emojiView, sizeNotifierLayout.getChildCount() - 1);
+        sizeNotifierLayout.addView(emojiView, 1);
         checkChannelRights();
     }
 
@@ -6454,7 +6465,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             int previusHeight = 0;
             if (contentType == 0) {
                 if (emojiView.getParent() == null) {
-                    sizeNotifierLayout.addView(emojiView, sizeNotifierLayout.getChildCount() - 1);
+//                    sizeNotifierLayout.addView(emojiView, sizeNotifierLayout.getChildCount() - 1);
+                    sizeNotifierLayout.addView(emojiView, 1);
                 }
                 samePannelWasVisible = emojiViewVisible && emojiView.getVisibility() == View.VISIBLE;
                 emojiView.setVisibility(VISIBLE);
@@ -7410,6 +7422,14 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
 
     }
 
+    public int getTopViewHeight(){
+        return isTopViewVisible() ? 0 : topView.getHeight();
+    }
+
+    public View getTopView(){
+        return topView;
+    }
+
     private class ScrimDrawable extends Drawable {
 
         private Paint paint;
@@ -7922,5 +7942,9 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
 
     public RecordCircle getRecordCicle() {
         return recordCircle;
+    }
+
+    public void setMessageAnimationHelper(MessageAnimationHelper messageAnimationHelper){
+        this.messageAnimationHelper=messageAnimationHelper;
     }
 }

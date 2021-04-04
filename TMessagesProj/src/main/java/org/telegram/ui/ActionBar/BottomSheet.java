@@ -1278,7 +1278,8 @@ public class BottomSheet extends Dialog {
                 }
             });
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.stopAllHeavyOperations, 512);
-            currentSheetAnimation.start();
+            if(!beforeDismissAnimationStart())
+                currentSheetAnimation.start();
         }
 
         Bulletin bulletin = Bulletin.getVisibleBulletin();
@@ -1308,6 +1309,10 @@ public class BottomSheet extends Dialog {
     }
 
     protected boolean onCustomOpenAnimation() {
+        return false;
+    }
+
+    protected boolean beforeDismissAnimationStart(){
         return false;
     }
 

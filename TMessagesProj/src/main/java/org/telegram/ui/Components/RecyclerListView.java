@@ -148,8 +148,8 @@ public class RecyclerListView extends RecyclerView {
         boolean onInterceptTouchEvent(MotionEvent event);
     }
 
-    public abstract static class SelectionAdapter extends Adapter {
-        public abstract boolean isEnabled(ViewHolder holder);
+    public abstract static class SelectionAdapter<VH extends ViewHolder> extends Adapter<VH> {
+        public abstract boolean isEnabled(VH holder);
 
         public int getSelectionBottomPadding(View view) {
             return 0;

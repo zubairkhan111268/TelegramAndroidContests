@@ -5950,4 +5950,8 @@ public class MessageObject {
     public boolean equals(MessageObject obj) {
         return getId() == obj.getId() && getDialogId() == obj.getDialogId();
     }
+
+    public int getEmojiOnlyCount(){
+        return emojiOnlyCount;
+    }
 }
