@@ -810,6 +810,8 @@ public class MessageAnimationHelper{
 	}
 
 	private AnimationSettings.MessageAnimationParameters getParamsForNextMessage(){
+		if(nextMessageType==null)
+			return AnimationSettings.shortTextMessageParams;
 		switch(nextMessageType){
 			case LONG_TEXT:
 				return AnimationSettings.longTextMessageParams;

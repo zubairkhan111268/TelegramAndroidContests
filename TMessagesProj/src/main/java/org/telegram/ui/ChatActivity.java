@@ -5999,6 +5999,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                     updateScheduledInterface(false);
                 }
                 hideFieldPanel(notify, scheduleDate, true);
+                messageAnimationHelper.beforeSendTextMessage(message);
             }
 
             @Override
