@@ -160,6 +160,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
     ActionBarPopupWindow optionsWindow;
     FlickerLoadingView globalGradientView;
     private final int viewType;
+    private HintView noForwardTooltip;
 
     public boolean checkPinchToZoom(MotionEvent ev) {
         if (mediaPages[0].selectedType != 0 || getParent() == null) {
@@ -3030,6 +3031,19 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 cantDeleteMessagesCount = 0;
             }, null);
         } else if (id == forward) {
+            if(DialogObject.isChatDialog(dialog_id)){
+                TLRPC.Chat chat=profileActivity.getMessagesController().getChat(-dialog_id);
+                if(chat.noforwards){
+                    if(noForwardTooltip==null){
+                        noForwardTooltip=new HintView(getContext(), 9, true);
+                        noForwardTooltip.setText(chat.broadcast ? LocaleController.getString("ForwardsRestrictedChannel", R.string.ForwardsRestrictedChannel) : LocaleController.getString("ForwardsRestrictedGroup", R.string.ForwardsRestrictedGroup));
+                        addView(noForwardTooltip, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 10, 0, 10, 0));
+                        noForwardTooltip.setVisibility(View.GONE);
+                    }
+                    noForwardTooltip.showForView(forwardItem, true);
+                    return;
+                }
+            }
             Bundle args = new Bundle();
             args.putBoolean("onlySelect", true);
             args.putInt("dialogsType", 3);
@@ -3454,6 +3468,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         }
         if (show) {
             actionModeLayout.setVisibility(VISIBLE);
+            updateForwardItemAlpha();
+            profileActivity.getNotificationCenter().addObserver(this, NotificationCenter.chatInfoDidLoad);
+        }else{
+            profileActivity.getNotificationCenter().removeObserver(this, NotificationCenter.chatInfoDidLoad);
         }
         actionModeAnimation = new AnimatorSet();
         actionModeAnimation.playTogether(ObjectAnimator.ofFloat(actionModeLayout, View.ALPHA, show ? 1.0f : 0.0f));
@@ -3476,6 +3494,13 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
             }
         });
         actionModeAnimation.start();
+    }
+
+    private void updateForwardItemAlpha(){
+        if(DialogObject.isChatDialog(dialog_id)){
+            TLRPC.Chat chat=profileActivity.getMessagesController().getChat(-dialog_id);
+            forwardItem.setAlpha(chat.noforwards ? .5f : 1);
+        }
     }
 
     @Override
@@ -3800,6 +3825,8 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     }
                 }
             }
+        }else if(id==NotificationCenter.chatInfoDidLoad){
+            updateForwardItemAlpha();
         }
     }
 

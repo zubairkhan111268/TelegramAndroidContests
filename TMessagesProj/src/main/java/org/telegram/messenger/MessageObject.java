@@ -1841,6 +1841,10 @@ public class MessageObject {
             messageText = replaceWithLink(LocaleController.getString("JoinedViaInviteLinkApproved", R.string.JoinedViaInviteLinkApproved), "un1", fromUser);
             messageText = replaceWithLink(messageText, "un2", action.invite);
             messageText = replaceWithLink(messageText, "un3", MessagesController.getInstance(currentAccount).getUser(action.approved_by));
+        }else if(event.action instanceof TLRPC.TL_channelAdminLogEventActionToggleNoForwards){
+            TLRPC.TL_channelAdminLogEventActionToggleNoForwards action=(TLRPC.TL_channelAdminLogEventActionToggleNoForwards)event.action;
+            messageText=replaceWithLink(action.new_value ? LocaleController.getString("EnabledSavingRestrictions", R.string.EnabledSavingRestrictions) :
+                            LocaleController.getString("DisabledSavingRestrictions", R.string.DisabledSavingRestrictions), "un1", fromUser);
         } else {
             messageText = "unsupported " + event.action;
         }

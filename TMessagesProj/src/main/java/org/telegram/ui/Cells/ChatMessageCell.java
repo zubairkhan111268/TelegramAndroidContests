@@ -68,8 +68,6 @@ import android.widget.Toast;
 
 import androidx.core.graphics.ColorUtils;
 
-import com.google.android.exoplayer2.util.Log;
-
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
@@ -9607,7 +9605,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 return false;
             }
         }
-        return messageObject.needDrawShareButton();
+        if(messageObject.needDrawShareButton()){
+            long chatID=messageObject.getChatId();
+            if(chatID!=0){
+                TLRPC.Chat chat=MessagesController.getInstance(currentAccount).getChat(chatID);
+                return !chat.noforwards;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public void updateShareButton(){
+        currentMessageObject.forceUpdate=true;
+        setMessageContent(currentMessageObject, currentMessagesGroup, pinnedBottom, pinnedTop);
     }
 
     public boolean isInsideBackground(float x, float y) {
