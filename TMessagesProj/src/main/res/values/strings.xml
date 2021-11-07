@@ -4823,4 +4823,5 @@
     <string name="ForwardsRestrictedGroup">Forwards from this group are restricted</string>
     <string name="EnabledSavingRestrictions">un1 enabled content saving restrictions</string>
 	<string name="DisabledSavingRestrictions">un1 disabled content saving restrictions</string>
+    <string name="SendMessageAs">Send message as...</string>
 </resources>

@@ -14606,6 +14606,10 @@ public class MessagesController extends BaseController implements NotificationCe
                 .apply();
     }
 
+    public void getSendAsPeers(TLRPC.Chat chat, SendAsChannelCache.OnSendAsPeersLoadedCallback callback){
+        getSendAsChannelCache().getSendAsPeers(chat, callback);
+    }
+
     public interface MessagesLoadedCallback {
         void onMessagesLoaded(boolean fromCache);
         void onError();

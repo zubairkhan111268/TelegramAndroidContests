@@ -479,6 +479,12 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
     private final Drawable doneCheckDrawable;
     boolean doneButtonEnabled = true;
     private ValueAnimator doneButtonColorAnimator;
+    private SendAsChannelButton sendAsChannelBtn;
+    private TLRPC.TL_channels_sendAsPeers sendAsPeers;
+    private boolean sendAsPeersLoading;
+    private SendAsChannelChooser sendAsChooser;
+    private boolean sendAsChooserShown;
+    private boolean needShowSendAsAfterStickersCollapsed;
 
     private Runnable openKeyboardRunnable = new Runnable() {
         @Override
@@ -3789,6 +3795,102 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             emojiView.setChatInfo(info);
         }
         setSlowModeTimer(chatInfo.slowmode_next_send_date);
+        if (DialogObject.isChatDialog(dialog_id)) {
+            TLRPC.Chat chat = accountInstance.getMessagesController().getChat(-dialog_id);
+            if(ChatObject.canWriteOnBehalfOfChannel(chat) && chatInfo.default_send_as!=null){
+                showSendAsChannel();
+                sendAsChannelBtn.setSelectedPeer(chatInfo.default_send_as);
+                if(sendAsPeers==null && !sendAsPeersLoading){
+                    sendAsPeersLoading=true;
+                    parentFragment.getMessagesController().getSendAsPeers(chat, this::onSendAsPeersLoaded);
+                }
+            }
+        }
+    }
+
+    private void showSendAsChannel(){
+        if(sendAsChannelBtn==null){
+            ((LayoutParams)textFieldContainer.getLayoutParams()).leftMargin=AndroidUtilities.dp(40);
+            requestLayout();
+            sendAsChannelBtn=new SendAsChannelButton(parentActivity, parentFragment.getMessagesController(), resourcesProvider);
+            sendAsChannelBtn.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
+            sendAsChannelBtn.setOnClickListener(this::onSendAsChannelClick);
+            addView(sendAsChannelBtn, LayoutHelper.createFrame(48, 48, Gravity.BOTTOM | Gravity.LEFT));
+        }
+    }
+
+    private void onSendAsPeersLoaded(TLRPC.TL_channels_sendAsPeers peers){
+        sendAsPeersLoading=false;
+        sendAsPeers=peers;
+        for(TLRPC.Peer peer:sendAsPeers.peers){
+            if(peer.channel_id!=0){
+				parentFragment.getMessagesStorage().loadChatInfo(peer.channel_id, true, null, true, false);
+            }
+        }
+    }
+
+    private void onSendAsChannelClick(View v){
+    	if(stickersDragging)
+    	    return;
+    	if(sendAsPeers==null)
+    	    return;
+        if(sendAsChooserShown){
+            sendAsChooser.dismiss(null);
+            return;
+        }
+        if(stickersExpanded){
+            needShowSendAsAfterStickersCollapsed=true;
+            setStickersExpanded(false, true, false);
+            return;
+        }
+        if(sendAsChooser==null){
+            sendAsChooser=new SendAsChannelChooser(parentActivity, resourcesProvider);
+            sendAsChooser.setPeerChosenListener(this::onSendAsChannelChosen);
+            sendAsChooser.setDismissCallback(this::onSendAsChannelDismissed);
+            sendAsChooser.setPreDismissCallback(this::onSendAsChannelWillBeDismissed);
+        }
+        sendAsChooser.setPeersAndChoice(sendAsPeers.peers, info.default_send_as);
+        sizeNotifierLayout.addView(sendAsChooser);
+        sendAsChooserShown=true;
+        sendAsChannelBtn.setShowClose(true);
+        sendAsChooser.show();
+    }
+
+    public View getSendAsChannelChooser(){
+        return sendAsChooser;
+    }
+
+    private void onSendAsChannelChosen(TLRPC.Peer peer){
+        sendAsChooser.dismiss(null);
+        sendAsChannelBtn.setSelectedPeer(peer);
+        info.default_send_as=peer;
+        parentFragment.getMessagesStorage().updateChatInfo(info, false);
+        accountInstance.getMessagesController().putChatFull(info);
+        TLRPC.TL_messages_saveDefaultSendAs req=new TLRPC.TL_messages_saveDefaultSendAs();
+        TLRPC.Chat chat = accountInstance.getMessagesController().getChat(-dialog_id);
+        req.peer=MessagesController.getInputPeer(chat);
+        if(peer.user_id!=0)
+            req.send_as=MessagesController.getInputPeer(accountInstance.getMessagesController().getUser(peer.user_id));
+        else
+            req.send_as=MessagesController.getInputPeer(accountInstance.getMessagesController().getChat(peer.channel_id));
+        accountInstance.getConnectionsManager().sendRequest(req, (resp, err)->{});
+    }
+
+    private void onSendAsChannelWillBeDismissed(){
+        sendAsChannelBtn.setShowClose(false);
+    }
+
+    private void onSendAsChannelDismissed(){
+        sizeNotifierLayout.removeView(sendAsChooser);
+        sendAsChooserShown=false;
+    }
+
+    public boolean onBackPressed(){
+        if(sendAsChooserShown){
+            sendAsChooser.dismiss(null);
+            return false;
+        }
+        return true;
     }
 
     public void checkRoundVideo() {
@@ -4095,6 +4197,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         } else {
             sendMessageInternal(true, 0);
         }
+        if(sendAsChooserShown)
+            sendAsChooser.dismiss(null);
     }
 
     private void sendMessageInternal(boolean notify, int scheduleDate) {
@@ -6728,6 +6832,9 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                 if (!allowDragging()) {
                     return;
                 }
+                if(sendAsChooserShown){
+                    sendAsChooser.dismiss(null);
+                }
                 if (stickersExpansionAnim != null) {
                     stickersExpansionAnim.cancel();
                 }
@@ -7715,6 +7822,12 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         if (emojiView == null || !byDrag && stickersExpanded == expanded) {
             return;
         }
+        if(sendAsChooserShown){
+            sendAsChooser.dismiss(()->{
+                setStickersExpanded(expanded, animated, byDrag);
+            });
+            return;
+        }
         stickersExpanded = expanded;
         if (delegate != null) {
             delegate.onStickersExpandedChange();
@@ -7805,6 +7918,10 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                             showPopup(0, currentPopupContentType);
                         }
                         NotificationCenter.getInstance(currentAccount).onAnimationFinish(notificationsIndex);
+                        if(needShowSendAsAfterStickersCollapsed){
+                            needShowSendAsAfterStickersCollapsed=false;
+                            onSendAsChannelClick(sendAsChannelBtn);
+                        }
                     }
                 });
                 stickersExpansionProgress = 1f;

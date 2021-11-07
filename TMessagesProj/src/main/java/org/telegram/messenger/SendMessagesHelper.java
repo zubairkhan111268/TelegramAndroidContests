@@ -3105,6 +3105,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         long linkedToGroup = 0;
         TLRPC.EncryptedChat encryptedChat = null;
         TLRPC.InputPeer sendToPeer = !DialogObject.isEncryptedDialog(peer) ? getMessagesController().getInputPeer(peer) : null;
+        TLRPC.InputPeer sendOnBehalfOfPeer=null;
+        TLRPC.Peer sendOnBehalfOfActualPeer=null;
         long myId = getUserConfig().getClientUserId();
         if (DialogObject.isEncryptedDialog(peer)) {
             encryptedChat = getMessagesController().getEncryptedChat(DialogObject.getEncryptedChatId(peer));
@@ -3124,6 +3126,13 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 TLRPC.ChatFull chatFull = getMessagesController().getChatFull(chat.id);
                 if (chatFull != null) {
                     linkedToGroup = chatFull.linked_chat_id;
+                }
+            }
+            if(ChatObject.canWriteOnBehalfOfChannel(chat)){
+                TLRPC.ChatFull chatFull = getMessagesController().getChatFull(chat.id);
+                if (chatFull != null) {
+                    sendOnBehalfOfPeer=getMessagesController().getInputPeer(chatFull.default_send_as);
+                    sendOnBehalfOfActualPeer=chatFull.default_send_as;
                 }
             }
             anonymously = ChatObject.shouldSendAnonymously(chat);
@@ -3432,6 +3441,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         newMsg.post_author = rank;
                         newMsg.flags |= 65536;
                     }
+                }else if(sendOnBehalfOfPeer!=null && sendOnBehalfOfPeer.channel_id!=0){
+                    newMsg.from_id=sendOnBehalfOfActualPeer;
                 } else {
                     newMsg.from_id = new TLRPC.TL_peerUser();
                     newMsg.from_id.user_id = myId;
@@ -3651,6 +3662,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     if (scheduleDate != 0) {
                         reqSend.schedule_date = scheduleDate;
                         reqSend.flags |= 1024;
+                    }
+                    if(sendOnBehalfOfPeer!=null){
+                        reqSend.send_as=sendOnBehalfOfPeer;
+                        reqSend.flags|=1 << 13;
                     }
                     performSendMessageRequest(reqSend, newMsgObj, null, null, parentObject, params, scheduleDate != 0);
                     if (retryMessageObject == null) {
@@ -3967,6 +3982,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                 request.schedule_date = scheduleDate;
                                 request.flags |= 1024;
                             }
+                            if(sendOnBehalfOfPeer!=null){
+                                request.send_as=sendOnBehalfOfPeer;
+                                request.flags|=1 << 13;
+                            }
                             delayedMessage.sendRequest = request;
                         }
                         delayedMessage.messageObjects.add(newMsgObj);
@@ -4005,6 +4024,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         if (scheduleDate != 0) {
                             request.schedule_date = scheduleDate;
                             request.flags |= 1024;
+                        }
+                        if(sendOnBehalfOfPeer!=null){
+                            request.send_as=sendOnBehalfOfPeer;
+                            request.flags|=1 << 13;
                         }
 
                         if (delayedMessage != null) {
@@ -4356,6 +4379,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     reqSend.schedule_date = scheduleDate;
                     reqSend.flags |= 1024;
                 }
+                if(sendOnBehalfOfPeer!=null){
+                    reqSend.send_as=sendOnBehalfOfPeer;
+                    reqSend.flags|=1 << 13;
+                }
                 reqSend.random_id.add(newMsg.random_id);
                 if (retryMessageObject.getId() >= 0) {
                     reqSend.id.add(retryMessageObject.getId());
@@ -4380,6 +4407,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 if (scheduleDate != 0) {
                     reqSend.schedule_date = scheduleDate;
                     reqSend.flags |= 1024;
+                }
+                if(sendOnBehalfOfPeer!=null){
+                    reqSend.send_as=sendOnBehalfOfPeer;
+                    reqSend.flags|=1 << 13;
                 }
                 reqSend.query_id = Utilities.parseLong(params.get("query_id"));
                 reqSend.id = params.get("id");
@@ -5470,7 +5501,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         }
                     } else {
                         isSentError = true;
-                        if("CHAT_FORWARDS_RESTRICTED".equals(error.text)){
+                        if("SEND_AS_PEER_INVALID".equals(error.text)){
+                            long peerID=-MessageObject.getPeerId(newMsgObj.peer_id);
+                            getSendAsChannelCache().removeFromCache(peerID);
+                            getMessagesController().loadFullChat(peerID, 0, true);
+                        }else if("CHAT_FORWARDS_RESTRICTED".equals(error.text)){
                             TLRPC.Peer peer=newMsgObj.fwd_from.from_id;
                             getMessagesController().loadFullChat(peer.chat_id==0 ? peer.channel_id : peer.chat_id, 0, true);
                             AlertsCreator.processError(currentAccount, error, null, req, peer.chat_id==0);

@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import org.telegram.tgnet.ConnectionsManager;
 
 public class AccountInstance {
-
+    private SendAsChannelCache sendAsChannelCache;
     private int currentAccount;
     private static volatile AccountInstance[] Instance = new AccountInstance[UserConfig.MAX_ACCOUNT_COUNT];
     public static AccountInstance getInstance(int num) {
@@ -95,5 +95,12 @@ public class AccountInstance {
 
     public int getCurrentAccount() {
         return currentAccount;
+    }
+
+    public SendAsChannelCache getSendAsChannelCache(){
+        if(sendAsChannelCache==null){
+            sendAsChannelCache=new SendAsChannelCache(getConnectionsManager());
+        }
+        return sendAsChannelCache;
     }
 }

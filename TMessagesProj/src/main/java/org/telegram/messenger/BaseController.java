@@ -79,4 +79,8 @@ public class BaseController {
     protected final MemberRequestsController getMemberRequestsController() {
         return parentAccountInstance.getMemberRequestsController();
     }
+
+    protected final SendAsChannelCache getSendAsChannelCache(){
+        return parentAccountInstance.getSendAsChannelCache();
+    }
 }

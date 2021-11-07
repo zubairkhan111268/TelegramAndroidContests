@@ -3221,7 +3221,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         int contentWidthSpec = MeasureSpec.makeMeasureSpec(widthSize, MeasureSpec.EXACTLY);
                         int contentHeightSpec = MeasureSpec.makeMeasureSpec(Math.max(AndroidUtilities.dp(10), heightSize - inputFieldHeight - (inPreviewMode && Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0) + AndroidUtilities.dp(2 + (chatActivityEnterView.isTopViewVisible() ? 48 : 0))), MeasureSpec.EXACTLY);
                         child.measure(contentWidthSpec, contentHeightSpec);
-                    } else if (child == instantCameraView || child == overlayView) {
+                    } else if (child == instantCameraView || child == overlayView || child==chatActivityEnterView.getSendAsChannelChooser()) {
                         int contentWidthSpec = MeasureSpec.makeMeasureSpec(widthSize, MeasureSpec.EXACTLY);
                         int contentHeightSpec = MeasureSpec.makeMeasureSpec(allHeight - inputFieldHeight - chatEmojiViewPadding + AndroidUtilities.dp(3), MeasureSpec.EXACTLY);
                         child.measure(contentWidthSpec, contentHeightSpec);
@@ -3411,7 +3411,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                             childTop = lp.topMargin;
                     }
 
-                    if (child == blurredView) {
+                    if (child == blurredView || child==chatActivityEnterView.getSendAsChannelChooser()) {
                         childTop = 0;
                     } else if (child instanceof HintView || child instanceof ChecksHintView) {
                         childTop = 0;
@@ -6681,6 +6681,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                                     pagedownButton.setTranslationY(v);
                                 }
                                 chatListView.setTranslationY(v);
+                                View sendAsChooser=chatActivityEnterView.getSendAsChannelChooser();
+                                if(sendAsChooser!=null){
+                                	sendAsChooser.setTranslationY(v);
+								}
                                 invalidateChatListViewTopPadding();
                                 invalidateMessagesVisiblePart();
                             }
@@ -14657,10 +14661,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 						}
 					}
 				}
-				if(currentChat.noforwards){
-					forwardButton.setAlpha(0.5f);
-				}else{
-					forwardButton.setAlpha(1);
+				if(forwardButton!=null){
+					if(currentChat.noforwards){
+						forwardButton.setAlpha(0.5f);
+					}else{
+						forwardButton.setAlpha(1);
+					}
 				}
             }
         } else if (id == NotificationCenter.chatInfoCantLoad) {
@@ -21382,7 +21388,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         } else if (chatActivityEnterView != null && chatActivityEnterView.botCommandsMenuIsShowing()) {
             chatActivityEnterView.hideBotCommands();
             return false;
-        }
+        }else if(chatActivityEnterView!=null && !chatActivityEnterView.onBackPressed()){
+        	return false;
+		}
         if (backToPreviousFragment != null) {
             parentLayout.fragmentsStack.add(parentLayout.fragmentsStack.size() - 1, backToPreviousFragment);
             backToPreviousFragment = null;
