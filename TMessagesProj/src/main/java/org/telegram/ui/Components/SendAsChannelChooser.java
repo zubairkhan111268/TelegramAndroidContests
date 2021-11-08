@@ -21,6 +21,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -287,7 +288,7 @@ public class SendAsChannelChooser extends FrameLayout{
 				object = MessagesController.getInstance(UserConfig.selectedAccount).getChat(-did);
 				TLRPC.ChatFull full=MessagesController.getInstance(UserConfig.selectedAccount).getChatFull(-did);
 				if(full!=null)
-					status = LocaleController.formatPluralString("Subscribers", full.participants_count);
+					status = LocaleController.formatPluralString(ChatObject.isChannelAndNotMegaGroup((TLRPC.Chat)object) ? "Subscribers" : "Members", full.participants_count);
 				else
 					status=null;
 			}

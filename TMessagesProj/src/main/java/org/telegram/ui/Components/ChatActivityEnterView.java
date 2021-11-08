@@ -3800,6 +3800,21 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             if(ChatObject.canWriteOnBehalfOfChannel(chat) && chatInfo.default_send_as!=null){
                 showSendAsChannel();
                 sendAsChannelBtn.setSelectedPeer(chatInfo.default_send_as);
+                if(sendAsPeers!=null){
+                    boolean found=false;
+                    long defaultDid=MessageObject.getPeerId(chatInfo.default_send_as);
+                    for(TLRPC.Peer peer:sendAsPeers.peers){
+                        long did=MessageObject.getPeerId(peer);
+                        if(did==defaultDid){
+                            found=true;
+                            break;
+                        }
+                    }
+                    if(!found){
+                        sendAsPeers=null;
+                        accountInstance.getSendAsChannelCache().removeFromCache(-dialog_id);
+                    }
+                }
                 if(sendAsPeers==null && !sendAsPeersLoading){
                     sendAsPeersLoading=true;
                     parentFragment.getMessagesController().getSendAsPeers(chat, this::onSendAsPeersLoaded);
@@ -3873,7 +3888,12 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             req.send_as=MessagesController.getInputPeer(accountInstance.getMessagesController().getUser(peer.user_id));
         else
             req.send_as=MessagesController.getInputPeer(accountInstance.getMessagesController().getChat(peer.channel_id));
-        accountInstance.getConnectionsManager().sendRequest(req, (resp, err)->{});
+        accountInstance.getConnectionsManager().sendRequest(req, (resp, err)->{
+            if(err!=null){
+                accountInstance.getSendAsChannelCache().removeFromCache(-dialog_id);
+                parentFragment.getMessagesController().loadFullChat(-dialog_id, 0, true);
+            }
+        });
     }
 
     private void onSendAsChannelWillBeDismissed(){
