@@ -3797,27 +3797,31 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         setSlowModeTimer(chatInfo.slowmode_next_send_date);
         if (DialogObject.isChatDialog(dialog_id)) {
             TLRPC.Chat chat = accountInstance.getMessagesController().getChat(-dialog_id);
-            if(ChatObject.canWriteOnBehalfOfChannel(chat) && chatInfo.default_send_as!=null){
-                showSendAsChannel();
-                sendAsChannelBtn.setSelectedPeer(chatInfo.default_send_as);
-                if(sendAsPeers!=null){
-                    boolean found=false;
-                    long defaultDid=MessageObject.getPeerId(chatInfo.default_send_as);
-                    for(TLRPC.Peer peer:sendAsPeers.peers){
-                        long did=MessageObject.getPeerId(peer);
-                        if(did==defaultDid){
-                            found=true;
-                            break;
+            if(ChatObject.canWriteOnBehalfOfChannel(chat)){
+                if(chatInfo.default_send_as!=null){
+                    showSendAsChannel();
+                    sendAsChannelBtn.setSelectedPeer(chatInfo.default_send_as);
+                    if(sendAsPeers!=null){
+                        boolean found=false;
+                        long defaultDid=MessageObject.getPeerId(chatInfo.default_send_as);
+                        for(TLRPC.Peer peer : sendAsPeers.peers){
+                            long did=MessageObject.getPeerId(peer);
+                            if(did==defaultDid){
+                                found=true;
+                                break;
+                            }
+                        }
+                        if(!found){
+                            sendAsPeers=null;
+                            accountInstance.getSendAsChannelCache().removeFromCache(-dialog_id);
                         }
                     }
-                    if(!found){
-                        sendAsPeers=null;
-                        accountInstance.getSendAsChannelCache().removeFromCache(-dialog_id);
+                    if(sendAsPeers==null && !sendAsPeersLoading){
+                        sendAsPeersLoading=true;
+                        parentFragment.getMessagesController().getSendAsPeers(chat, this::onSendAsPeersLoaded);
                     }
-                }
-                if(sendAsPeers==null && !sendAsPeersLoading){
-                    sendAsPeersLoading=true;
-                    parentFragment.getMessagesController().getSendAsPeers(chat, this::onSendAsPeersLoaded);
+                }else if(sendAsChannelBtn!=null){
+                    hideSendAsChannel();
                 }
             }
         }
@@ -3832,6 +3836,13 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             sendAsChannelBtn.setOnClickListener(this::onSendAsChannelClick);
             addView(sendAsChannelBtn, LayoutHelper.createFrame(48, 48, Gravity.BOTTOM | Gravity.LEFT));
         }
+    }
+
+    private void hideSendAsChannel(){
+        ((LayoutParams)textFieldContainer.getLayoutParams()).leftMargin=AndroidUtilities.dp(40);
+        requestLayout();
+        removeView(sendAsChannelBtn);
+        sendAsChannelBtn=null;
     }
 
     private void onSendAsPeersLoaded(TLRPC.TL_channels_sendAsPeers peers){
