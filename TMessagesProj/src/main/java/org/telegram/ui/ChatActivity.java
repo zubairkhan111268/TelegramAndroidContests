@@ -1610,6 +1610,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             forwardEndReached[0] = forwardEndReached[1] = true;
             firstLoading = false;
         }
+        int dateOffset=getArguments().getInt("date_offset");
         if (chatMode != MODE_PINNED && !forceHistoryEmpty) {
             waitingForLoad.add(lastLoadIndex);
             if (startLoadFromMessageId != 0 && (!isThreadChat() || startLoadFromMessageId == highlightMessageId)) {
@@ -1624,7 +1625,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 if (historyPreloaded) {
                     lastLoadIndex++;
                 } else {
-                    getMessagesController().loadMessages(dialog_id, mergeDialogId, loadInfo, AndroidUtilities.isTablet() || isThreadChat() ? 30 : 20, startLoadFromMessageId, 0, true, 0, classGuid, 2, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++);
+                    getMessagesController().loadMessages(dialog_id, mergeDialogId, loadInfo, AndroidUtilities.isTablet() || isThreadChat() ? 30 : 20, startLoadFromMessageId, dateOffset, true, 0, classGuid, dateOffset!=0 ? 4 : 2, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++);
                 }
             }
         }
@@ -3714,6 +3715,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
             @Override
             public boolean onInterceptTouchEvent(MotionEvent e) {
+            	if(inPreviewMode){
+            		return true;
+				}
                 textSelectionHelper.checkSelectionCancel(e);
                 if (isFastScrollAnimationRunning()) {
                     return false;
@@ -3882,6 +3886,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
             @Override
             public boolean onTouchEvent(MotionEvent e) {
+            	if(inPreviewMode){
+            		return super.onTouchEvent(e);
+				}
                 textSelectionHelper.checkSelectionCancel(e);
                 if (e.getAction() == MotionEvent.ACTION_DOWN) {
                     scrollByTouch = true;
@@ -8883,7 +8890,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         return groupedMessages;
     }
 
-    private void jumpToDate(int date) {
+    public void jumpToDate(int date) {
         if (messages.isEmpty()) {
             return;
         }
@@ -17359,7 +17366,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 }
             }
 
-            if (!backward && parentLayout != null && needRemovePreviousSameChatActivity) {
+            if (!backward && parentLayout != null && needRemovePreviousSameChatActivity && !inPreviewMode) {
                 for (int a = 0, N = parentLayout.fragmentsStack.size() - 1; a < N; a++) {
                     BaseFragment fragment = parentLayout.fragmentsStack.get(a);
                     if (fragment != this && fragment instanceof ChatActivity) {
@@ -18964,7 +18971,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         if (contentView != null) {
             contentView.onPause();
         }
-        if (chatMode == 0) {
+        if (chatMode == 0 && !inPreviewMode) {
             CharSequence[] message = new CharSequence[]{draftMessage};
             ArrayList<TLRPC.MessageEntity> entities = getMediaDataController().getEntities(message, currentEncryptedChat == null || AndroidUtilities.getPeerLayerVersion(currentEncryptedChat.layer) >= 101);
             getMediaDataController().saveDraft(dialog_id, threadMessageId, message[0], entities, replyMessage != null ? replyMessage.messageOwner : null, !searchWebpage);
@@ -19421,6 +19428,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         if (message == null) {
             return;
         }
+        if(message.isDateObject && currentUser!=null){
+        	Bundle args=new Bundle();
+        	args.putLong("dialog_id", dialog_id);
+        	presentFragment(new MediaCalendarDeleteHistoryActivity(args, this, message.messageOwner.date));
+        	return;
+		}
         final int type = getMessageType(message);
         if (single) {
             if (message.messageOwner.action instanceof TLRPC.TL_messageActionPinMessage) {

@@ -12,7 +12,10 @@ import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.NativeByteBuffer;
 
-public class SQLiteCursor {
+import java.io.Closeable;
+import java.io.IOException;
+
+public class SQLiteCursor implements Closeable{
 
 	public static final int FIELD_TYPE_INT = 1;
 	public static final int FIELD_TYPE_FLOAT = 2;
@@ -128,4 +131,10 @@ public class SQLiteCursor {
 	native String columnStringValue(long statementHandle, int columnIndex);
 	native byte[] columnByteArrayValue(long statementHandle, int columnIndex);
 	native long columnByteBufferValue(long statementHandle, int columnIndex);
+
+	// for try-with-resources
+	@Override
+	public void close() throws IOException{
+		dispose();
+	}
 }

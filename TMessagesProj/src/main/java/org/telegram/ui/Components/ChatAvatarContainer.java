@@ -83,7 +83,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
         this.resourcesProvider = resourcesProvider;
         parentFragment = chatActivity;
 
-        final boolean avatarClickable = parentFragment != null && parentFragment.getChatMode() == 0 && !UserObject.isReplyUser(parentFragment.getCurrentUser());
+        final boolean avatarClickable = parentFragment != null && parentFragment.getChatMode() == 0 && !UserObject.isReplyUser(parentFragment.getCurrentUser()) && !parentFragment.getParentLayout().touchablePreviewMode;
         avatarImageView = new BackupImageView(context) {
             @Override
             public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
@@ -171,6 +171,8 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
     }
 
     public boolean openSetTimer() {
+        if(parentFragment.getParentLayout().touchablePreviewMode)
+            return false;
         if (parentFragment.getParentActivity() == null) {
             return false;
         }
@@ -198,6 +200,8 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
     }
 
     private void openProfile(boolean byAvatar) {
+        if(parentFragment.getParentLayout().touchablePreviewMode)
+            return;
         if (byAvatar && (AndroidUtilities.isTablet() || AndroidUtilities.displaySize.x > AndroidUtilities.displaySize.y || !avatarImageView.getImageReceiver().hasNotThumb())) {
             byAvatar = false;
         }

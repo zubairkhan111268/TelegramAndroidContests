@@ -4204,6 +4204,12 @@
     <string name="StickerSets_few">%1$s sticker sets</string>
     <string name="StickerSets_many">%1$s sticker sets</string>
     <string name="StickerSets_other">%1$s sticker sets</string>
+    <string name="SelectedDays_zero">%1$d days</string>
+    <string name="SelectedDays_one">%1$d selected day</string>
+    <string name="SelectedDays_two">%1$d selected days</string>
+    <string name="SelectedDays_few">%1$d selected days</string>
+    <string name="SelectedDays_many">%1$d selected days</string>
+    <string name="SelectedDays_other">%1$d selected days</string>
     <!--forwarded messages-->
     <string name="ForwardedMessageCount_zero">%1$d forwarded messages</string>
     <string name="ForwardedMessageCount_one">Forwarded message</string>
@@ -4824,4 +4830,10 @@
     <string name="EnabledSavingRestrictions">un1 enabled content saving restrictions</string>
 	<string name="DisabledSavingRestrictions">un1 disabled content saving restrictions</string>
     <string name="SendMessageAs">Send message as...</string>
+    <string name="SelectDays">Select days</string>
+    <string name="SelectDaysTitle">Select days</string>
+    <string name="SelectThisDay">Select this day</string>
+    <string name="DeleteMessagesRangeTitle">Delete messages</string>
+    <string name="DeleteMessagesRangeText">Are you sure you want to delete all messages for the **%1$s**?</string>
+    <string name="DeleteMessagesRangeTextOneDay">Are you sure you want to delete all messages for **%1$s**?</string>
 </resources>

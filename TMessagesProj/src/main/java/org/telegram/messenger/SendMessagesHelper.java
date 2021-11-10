@@ -3021,7 +3021,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(peer.getObjectSize() + game.getObjectSize() + 4 + 8);
-                data.writeInt32(3);
+                data.writeInt32(MessagesStorage.PendingTaskType.SEND_GAME.serializedValue);
                 data.writeInt64(random_id);
                 peer.serializeToStream(data);
                 game.serializeToStream(data);

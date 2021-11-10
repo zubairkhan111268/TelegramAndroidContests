@@ -1801,7 +1801,7 @@ public class SecretChatHelper extends BaseController {
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(4 + 4 + 4);
-                data.writeInt32(100);
+                data.writeInt32(MessagesStorage.PendingTaskType.DECLINE_SECRET_CHAT.serializedValue);
                 data.writeInt32(chat_id);
                 data.writeBool(revoke);
             } catch (Exception e) {

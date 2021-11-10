@@ -21,7 +21,6 @@ import android.os.SystemClock;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
@@ -4403,7 +4402,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(1024);
-                    data.writeInt32(21);
+                    data.writeInt32(MessagesStorage.PendingTaskType.SAVE_WALLPAPER_TO_SERVER.serializedValue);
                     data.writeBool(info.isBlurred);
                     data.writeBool(info.isMotion);
                     data.writeInt32(info.color);
@@ -4557,7 +4556,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(12 + req.getObjectSize());
-                    data.writeInt32(24);
+                    data.writeInt32(MessagesStorage.PendingTaskType.DELETE_MESSAGES_3.serializedValue);
                     data.writeInt64(dialogId);
                     req.serializeToStream(data);
                 } catch (Exception e) {
@@ -4588,7 +4587,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(12 + req.getObjectSize());
-                    data.writeInt32(24);
+                    data.writeInt32(MessagesStorage.PendingTaskType.DELETE_MESSAGES_3.serializedValue);
                     data.writeInt64(dialogId);
                     req.serializeToStream(data);
                 } catch (Exception e) {
@@ -4622,7 +4621,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(12 + req.getObjectSize());
-                    data.writeInt32(24);
+                    data.writeInt32(MessagesStorage.PendingTaskType.DELETE_MESSAGES_3.serializedValue);
                     data.writeInt64(dialogId);
                     req.serializeToStream(data);
                 } catch (Exception e) {
@@ -4838,7 +4837,11 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void deleteDialog(final long did, int onlyHistory, boolean revoke) {
-        deleteDialog(did, 1, onlyHistory, 0, revoke, null, 0);
+        deleteDialog(did, 1, onlyHistory, 0, revoke, 0, 0, null, 0);
+    }
+
+    public void deleteDialog(long did, boolean revoke, int minDate, int maxDate){
+        deleteDialog(did, 1, 1, 0, revoke, minDate, maxDate, null, 0);
     }
 
     public void setDialogHistoryTTL(long did, int ttl) {
@@ -4886,7 +4889,7 @@ public class MessagesController extends BaseController implements NotificationCe
         }
     }
 
-    protected void deleteDialog(long did, int first, int onlyHistory, int max_id, boolean revoke, TLRPC.InputPeer peer, long taskId) {
+    protected void deleteDialog(long did, int first, int onlyHistory, int max_id, boolean revoke, int minDate, int maxDate, TLRPC.InputPeer peer, long taskId) {
         if (onlyHistory == 2) {
             getMessagesStorage().deleteDialog(did, onlyHistory);
             return;
@@ -4894,7 +4897,7 @@ public class MessagesController extends BaseController implements NotificationCe
         if (first == 1 && max_id == 0) {
             TLRPC.InputPeer peerFinal = peer;
             getMessagesStorage().getDialogMaxMessageId(did, (param) -> {
-                deleteDialog(did, 2, onlyHistory, Math.max(0, param), revoke, peerFinal, taskId);
+                deleteDialog(did, 2, onlyHistory, Math.max(0, param), revoke, minDate, maxDate, peerFinal, taskId);
                 checkIfFolderEmpty(1);
             });
             return;
@@ -4909,84 +4912,88 @@ public class MessagesController extends BaseController implements NotificationCe
                 FileLog.d("delete dialog with id " + did);
             }
             boolean isPromoDialog = false;
-            getMessagesStorage().deleteDialog(did, onlyHistory);
-            TLRPC.Dialog dialog = dialogs_dict.get(did);
-            if (onlyHistory == 0 || onlyHistory == 3) {
-                getNotificationCenter().postNotificationName(NotificationCenter.dialogDeleted, did);
-                getNotificationsController().deleteNotificationChannel(did);
-                JoinCallAlert.processDeletedChat(currentAccount, did);
-            }
-            if (onlyHistory == 0) {
-                getMediaDataController().cleanDraft(did, 0, false);
-            }
-            if (dialog != null) {
-                if (first == 2) {
-                    max_id_delete = Math.max(0, dialog.top_message);
-                    max_id_delete = Math.max(max_id_delete, dialog.read_inbox_max_id);
-                    max_id_delete = Math.max(max_id_delete, dialog.read_outbox_max_id);
-                }
-                if (onlyHistory == 0 || onlyHistory == 3) {
-                    if (isPromoDialog = (promoDialog != null && promoDialog.id == did)) {
-                        isLeftPromoChannel = true;
-                        if (promoDialog.id < 0) {
-                            TLRPC.Chat chat = getChat(-promoDialog.id);
-                            if (chat != null) {
-                                chat.left = true;
-                            }
-                        }
-                        sortDialogs(null);
-                    } else {
-                        removeDialog(dialog);
-                        int offset = nextDialogsCacheOffset.get(dialog.folder_id, 0);
-                        if (offset > 0) {
-                            nextDialogsCacheOffset.put(dialog.folder_id, offset - 1);
-                        }
-                    }
-                } else {
-                    dialog.unread_count = 0;
-                }
-                if (!isPromoDialog) {
-                    int lastMessageId;
-                    MessageObject object = dialogMessage.get(dialog.id);
-                    dialogMessage.remove(dialog.id);
-                    if (object != null) {
-                        lastMessageId = object.getId();
-                        if (object.messageOwner.peer_id.channel_id == 0) {
-                            dialogMessagesByIds.remove(object.getId());
-                        }
-                    } else {
-                        lastMessageId = dialog.top_message;
-                        object = dialogMessagesByIds.get(dialog.top_message);
-                        if (object != null && object.messageOwner.peer_id.channel_id == 0) {
-                            dialogMessagesByIds.remove(dialog.top_message);
-                        }
-                    }
-                    if (object != null && object.messageOwner.random_id != 0) {
-                        dialogMessagesByRandomIds.remove(object.messageOwner.random_id);
-                    }
-                    if (onlyHistory == 1 && !DialogObject.isEncryptedDialog(did) && lastMessageId > 0) {
-                        TLRPC.TL_messageService message = new TLRPC.TL_messageService();
-                        message.id = dialog.top_message;
-                        message.out = getUserConfig().getClientUserId() == did;
-                        message.from_id = new TLRPC.TL_peerUser();
-                        message.from_id.user_id = getUserConfig().getClientUserId();
-                        message.flags |= 256;
-                        message.action = new TLRPC.TL_messageActionHistoryClear();
-                        message.date = dialog.last_message_date;
-                        message.dialog_id = did;
-                        message.peer_id = getPeer(did);
-                        boolean isDialogCreated = createdDialogIds.contains(message.dialog_id);
-                        MessageObject obj = new MessageObject(currentAccount, message, isDialogCreated, isDialogCreated);
-                        ArrayList<MessageObject> objArr = new ArrayList<>();
-                        objArr.add(obj);
-                        ArrayList<TLRPC.Message> arr = new ArrayList<>();
-                        arr.add(message);
-                        updateInterfaceWithMessages(did, objArr, false);
-                        getMessagesStorage().putMessages(arr, false, true, false, 0, false);
-                    } else {
-                        dialog.top_message = 0;
-                    }
-                }
+            if(minDate==0 && maxDate==0){
+				getMessagesStorage().deleteDialog(did, onlyHistory);
+				TLRPC.Dialog dialog=dialogs_dict.get(did);
+				if(onlyHistory==0 || onlyHistory==3){
+					getNotificationCenter().postNotificationName(NotificationCenter.dialogDeleted, did);
+					getNotificationsController().deleteNotificationChannel(did);
+					JoinCallAlert.processDeletedChat(currentAccount, did);
+				}
+				if(onlyHistory==0){
+					getMediaDataController().cleanDraft(did, 0, false);
+				}
+				if(dialog!=null){
+					if(first==2){
+						max_id_delete=Math.max(0, dialog.top_message);
+						max_id_delete=Math.max(max_id_delete, dialog.read_inbox_max_id);
+						max_id_delete=Math.max(max_id_delete, dialog.read_outbox_max_id);
+					}
+					if(onlyHistory==0 || onlyHistory==3){
+						if(isPromoDialog=(promoDialog!=null && promoDialog.id==did)){
+							isLeftPromoChannel=true;
+							if(promoDialog.id<0){
+								TLRPC.Chat chat=getChat(-promoDialog.id);
+								if(chat!=null){
+									chat.left=true;
+								}
+							}
+							sortDialogs(null);
+						}else{
+							removeDialog(dialog);
+							int offset=nextDialogsCacheOffset.get(dialog.folder_id, 0);
+							if(offset>0){
+								nextDialogsCacheOffset.put(dialog.folder_id, offset-1);
+							}
+						}
+					}else{
+						dialog.unread_count=0;
+					}
+					if(!isPromoDialog){
+						int lastMessageId;
+						MessageObject object=dialogMessage.get(dialog.id);
+						dialogMessage.remove(dialog.id);
+						if(object!=null){
+							lastMessageId=object.getId();
+							if(object.messageOwner.peer_id.channel_id==0){
+								dialogMessagesByIds.remove(object.getId());
+							}
+						}else{
+							lastMessageId=dialog.top_message;
+							object=dialogMessagesByIds.get(dialog.top_message);
+							if(object!=null && object.messageOwner.peer_id.channel_id==0){
+								dialogMessagesByIds.remove(dialog.top_message);
+							}
+						}
+						if(object!=null && object.messageOwner.random_id!=0){
+							dialogMessagesByRandomIds.remove(object.messageOwner.random_id);
+						}
+						if(onlyHistory==1 && !DialogObject.isEncryptedDialog(did) && lastMessageId>0 && minDate==0 && maxDate==0){
+							TLRPC.TL_messageService message=new TLRPC.TL_messageService();
+							message.id=dialog.top_message;
+							message.out=getUserConfig().getClientUserId()==did;
+							message.from_id=new TLRPC.TL_peerUser();
+							message.from_id.user_id=getUserConfig().getClientUserId();
+							message.flags|=256;
+							message.action=new TLRPC.TL_messageActionHistoryClear();
+							message.date=dialog.last_message_date;
+							message.dialog_id=did;
+							message.peer_id=getPeer(did);
+							boolean isDialogCreated=createdDialogIds.contains(message.dialog_id);
+							MessageObject obj=new MessageObject(currentAccount, message, isDialogCreated, isDialogCreated);
+							ArrayList<MessageObject> objArr=new ArrayList<>();
+							objArr.add(obj);
+							ArrayList<TLRPC.Message> arr=new ArrayList<>();
+							arr.add(message);
+							updateInterfaceWithMessages(did, objArr, false);
+							getMessagesStorage().putMessages(arr, false, true, false, 0, false);
+						}else{
+							dialog.top_message=0;
+						}
+					}
+				}
+			}else{
+                getMessagesStorage().deleteMessagesInDateRange(did, minDate, maxDate);
             }
             if (first == 2) {
                 Integer max = dialogs_read_inbox_max.get(did);
@@ -5004,10 +5011,12 @@ public class MessagesController extends BaseController implements NotificationCe
                     getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload, true);
                 } else {
                     getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
-                    getNotificationCenter().postNotificationName(NotificationCenter.removeAllMessagesFromDialog, did, false, null);
+                    if(minDate==0 && maxDate==0)
+                        getNotificationCenter().postNotificationName(NotificationCenter.removeAllMessagesFromDialog, did, false, null);
                 }
             }
-            getMessagesStorage().getStorageQueue().postRunnable(() -> AndroidUtilities.runOnUIThread(() -> getNotificationsController().removeNotificationsForDialog(did)));
+            if(minDate==0 && maxDate==0)
+                getMessagesStorage().getStorageQueue().postRunnable(() -> AndroidUtilities.runOnUIThread(() -> getNotificationsController().removeNotificationsForDialog(did)));
         }
 
         if (onlyHistory == 3) {
@@ -5032,13 +5041,15 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (taskId == 0) {
                     NativeByteBuffer data = null;
                     try {
-                        data = new NativeByteBuffer(4 + 8 + 4 + 4 + 4 + 4 + peer.getObjectSize());
-                        data.writeInt32(13);
+                        data = new NativeByteBuffer(4 + 8 + 4 + 4 + 4 + 4 + 8 + peer.getObjectSize());
+                        data.writeInt32(MessagesStorage.PendingTaskType.DELETE_DIALOG_V2.serializedValue);
                         data.writeInt64(did);
                         data.writeBool(first != 0);
                         data.writeInt32(onlyHistory);
                         data.writeInt32(max_id_delete);
                         data.writeBool(revoke);
+                        data.writeInt32(minDate);
+                        data.writeInt32(maxDate);
                         peer.serializeToStream(data);
                     } catch (Exception e) {
                         FileLog.e(e);
@@ -5074,6 +5085,14 @@ public class MessagesController extends BaseController implements NotificationCe
                 req.max_id = max_id_delete > 0 ? max_id_delete : Integer.MAX_VALUE;
                 req.just_clear = onlyHistory != 0;
                 req.revoke = revoke;
+                if(minDate>0){
+                    req.min_date=minDate;
+                    req.flags|=(1<<2);
+                }
+                if(maxDate>0){
+                    req.max_date=maxDate;
+                    req.flags|=(1<<3);
+                }
                 int max_id_delete_final = max_id_delete;
                 TLRPC.InputPeer peerFinal = peer;
                 getConnectionsManager().sendRequest(req, (response, error) -> {
@@ -5083,7 +5102,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     if (error == null) {
                         TLRPC.TL_messages_affectedHistory res = (TLRPC.TL_messages_affectedHistory) response;
                         if (res.offset > 0) {
-                            deleteDialog(did, 0, onlyHistory, max_id_delete_final, revoke, peerFinal, 0);
+                            deleteDialog(did, 0, onlyHistory, max_id_delete_final, revoke, minDate, maxDate, peerFinal, 0);
                         }
                         processNewDifferenceParams(-1, res.pts, -1, res.pts_count);
                         getMessagesStorage().onDeleteQueryComplete(did);
@@ -6751,7 +6770,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(4 + 4 + 4 + size);
-                    data.writeInt32(17);
+                    data.writeInt32(MessagesStorage.PendingTaskType.ADD_DIALOG_TO_FOLDER.serializedValue);
                     data.writeInt32(folderId);
                     data.writeInt32(req.folder_peers.size());
                     for (int a = 0, N = req.folder_peers.size(); a < N; a++) {
@@ -7017,7 +7036,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(4 + peer.getObjectSize());
-                data.writeInt32(15);
+                data.writeInt32(MessagesStorage.PendingTaskType.LOAD_UNKNOWN_DIALOG.serializedValue);
                 peer.serializeToStream(data);
             } catch (Exception e) {
                 FileLog.e(e);
@@ -8037,7 +8056,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(4 + peer.getObjectSize());
-                data.writeInt32(22);
+                data.writeInt32(MessagesStorage.PendingTaskType.RELOAD_MENTIONS_COUNT_FOR_CHANNEL.serializedValue);
                 peer.serializeToStream(data);
             } catch (Exception e) {
                 FileLog.e(e);
@@ -8164,7 +8183,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(60 + req.peer.getObjectSize());
-                data.writeInt32(14);
+                data.writeInt32(MessagesStorage.PendingTaskType.CHECK_LAST_DIALOG_MESSAGE_V5.serializedValue);
                 data.writeInt64(dialog.id);
                 data.writeInt32(dialog.top_message);
                 data.writeInt32(dialog.read_inbox_max_id);
@@ -8581,7 +8600,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(20 + (inputChannel != null ? inputChannel.getObjectSize() : 0));
-                data.writeInt32(23);
+                data.writeInt32(MessagesStorage.PendingTaskType.MARK_MESSAGE_AS_READ_2_1.serializedValue);
                 data.writeInt64(dialogId);
                 data.writeInt32(mid);
                 data.writeInt32(ttl);
@@ -9803,7 +9822,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(4 + channel.getObjectSize());
-                data.writeInt32(0);
+                data.writeInt32(MessagesStorage.PendingTaskType.LOAD_UNKNOWN_CHANNEL.serializedValue);
                 channel.serializeToStream(data);
             } catch (Exception e) {
                 FileLog.e(e);
@@ -9950,7 +9969,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(16 + inputChannel.getObjectSize());
-                data.writeInt32(25);
+                data.writeInt32(MessagesStorage.PendingTaskType.GET_CHANNEL_DIFFERENCE_3.serializedValue);
                 data.writeInt64(channelId);
                 data.writeInt32(newDialogType);
                 inputChannel.serializeToStream(data);
@@ -10432,7 +10451,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 NativeByteBuffer data = null;
                 try {
                     data = new NativeByteBuffer(12 + peer.getObjectSize());
-                    data.writeInt32(9);
+                    data.writeInt32(MessagesStorage.PendingTaskType.MARK_DIALOG_AS_UNREAD.serializedValue);
                     data.writeInt64(dialogId);
                     peer.serializeToStream(data);
                 } catch (Exception e) {
@@ -10531,7 +10550,7 @@ public class MessagesController extends BaseController implements NotificationCe
             NativeByteBuffer data = null;
             try {
                 data = new NativeByteBuffer(4 + 4 + 4 + size);
-                data.writeInt32(16);
+                data.writeInt32(MessagesStorage.PendingTaskType.REORDER_PINNED_DIALOGS.serializedValue);
                 data.writeInt32(folderId);
                 data.writeInt32(req.order.size());
                 for (int a = 0, N = req.order.size(); a < N; a++) {
@@ -10604,7 +10623,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     NativeByteBuffer data = null;
                     try {
                         data = new NativeByteBuffer(16 + peer.getObjectSize());
-                        data.writeInt32(4);
+                        data.writeInt32(MessagesStorage.PendingTaskType.PIN_DIALOG.serializedValue);
                         data.writeInt64(dialogId);
                         data.writeBool(pin);
                         peer.serializeToStream(data);

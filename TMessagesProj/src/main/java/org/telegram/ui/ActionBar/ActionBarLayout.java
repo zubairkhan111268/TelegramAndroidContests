@@ -191,12 +191,12 @@ public class ActionBarLayout extends FrameLayout {
 
         @Override
         public boolean dispatchTouchEvent(MotionEvent ev) {
-            if ((inPreviewMode || transitionAnimationPreviewMode) && (ev.getActionMasked() == MotionEvent.ACTION_DOWN || ev.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN)) {
+            if ((inPreviewMode || transitionAnimationPreviewMode) && !touchablePreviewMode && (ev.getActionMasked() == MotionEvent.ACTION_DOWN || ev.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN)) {
                 return false;
             }
             //
             try {
-                return (!inPreviewMode || this != containerView) && super.dispatchTouchEvent(ev);
+                return (!(inPreviewMode && !touchablePreviewMode) || this != containerView) && super.dispatchTouchEvent(ev);
             } catch (Throwable e) {
                 FileLog.e(e);
             }
@@ -258,6 +258,7 @@ public class ActionBarLayout extends FrameLayout {
     private boolean inBubbleMode;
 
     private boolean inPreviewMode;
+    public boolean touchablePreviewMode;
     private boolean previewOpenAnimationInProgress;
     private ColorDrawable previewBackgroundDrawable;
 
@@ -328,6 +329,7 @@ public class ActionBarLayout extends FrameLayout {
     public ArrayList<BaseFragment> fragmentsStack;
     private Rect rect = new Rect();
     private boolean delayedAnimationResumed;
+    private boolean needDrawPreviewDrawables=true;
 
     public ActionBarLayout(Context context) {
         super(context);
@@ -575,9 +577,13 @@ public class ActionBarLayout extends FrameLayout {
         }
     }
 
+    public void setDrawPreviewDrawables(boolean draw){
+        needDrawPreviewDrawables=draw;
+    }
+
     private void drawPreviewDrawables(Canvas canvas, ViewGroup containerView) {
         View view = containerView.getChildAt(0);
-        if (view != null) {
+        if (view != null && needDrawPreviewDrawables) {
             previewBackgroundDrawable.setBounds(0, 0, getMeasuredWidth(), getMeasuredHeight());
             previewBackgroundDrawable.draw(canvas);
             int x = (getMeasuredWidth() - AndroidUtilities.dp(24)) / 2;
@@ -1039,7 +1045,6 @@ public class ActionBarLayout extends FrameLayout {
     }
 
     public boolean presentFragment(final BaseFragment fragment, final boolean removeLast, boolean forceWithoutAnimation, boolean check, final boolean preview) {
-        Log.e("11", "present fragment "+fragment.getClass().getName());
         if (fragment == null || checkTransitionAnimation() || delegate != null && check && !delegate.needPresentFragment(fragment, removeLast, forceWithoutAnimation, this) || !fragment.onFragmentCreate()) {
             return false;
         }
