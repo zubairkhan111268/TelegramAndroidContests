@@ -3130,7 +3130,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             }
             if(ChatObject.canWriteOnBehalfOfChannel(chat)){
                 TLRPC.ChatFull chatFull = getMessagesController().getChatFull(chat.id);
-                if (chatFull != null) {
+                if (chatFull != null && chatFull.default_send_as!=null) {
                     sendOnBehalfOfPeer=getMessagesController().getInputPeer(chatFull.default_send_as);
                     sendOnBehalfOfActualPeer=chatFull.default_send_as;
                 }
@@ -5505,7 +5505,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             long peerID=-MessageObject.getPeerId(newMsgObj.peer_id);
                             getSendAsChannelCache().removeFromCache(peerID);
                             getMessagesController().loadFullChat(peerID, 0, true);
-                        }else if("CHAT_FORWARDS_RESTRICTED".equals(error.text)){
+                        }else if("CHAT_FORWARDS_RESTRICTED".equals(error.text) && newMsgObj.fwd_from!=null){
                             TLRPC.Peer peer=newMsgObj.fwd_from.from_id;
                             getMessagesController().loadFullChat(peer.chat_id==0 ? peer.channel_id : peer.chat_id, 0, true);
                             AlertsCreator.processError(currentAccount, error, null, req, peer.chat_id==0);

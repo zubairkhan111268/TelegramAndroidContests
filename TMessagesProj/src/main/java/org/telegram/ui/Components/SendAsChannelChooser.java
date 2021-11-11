@@ -11,11 +11,14 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -107,8 +110,20 @@ public class SendAsChannelChooser extends FrameLayout{
 
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh){
-		setPadding(0, AndroidUtilities.statusBarHeight, 0, 0);
+//		if(Build.VERSION.SDK_INT<23)
+//			setPadding(0, AndroidUtilities.statusBarHeight, 0, 0);
+//		else
+//			setPadding(0, getRootWindowInsets().getSystemWindowInsetTop(), 0, 0);
 		super.onSizeChanged(w, h, oldw, oldh);
+	}
+
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec){
+		if(Build.VERSION.SDK_INT<23)
+			setPadding(0, AndroidUtilities.statusBarHeight, 0, 0);
+		else
+			setPadding(0, getRootWindowInsets().getSystemWindowInsetTop(), 0, 0);
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 	}
 
 	@Override

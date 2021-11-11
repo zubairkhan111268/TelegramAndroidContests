@@ -235,7 +235,7 @@ public class AlertsCreator {
                     showSimpleToast(fragment, LocaleController.getString("MessageScheduledLimitReached", R.string.MessageScheduledLimitReached));
                     break;
                 case "CHAT_FORWARDS_RESTRICTED":
-                    showSimpleToast(fragment, (Boolean)args[0] ? LocaleController.getString("ForwardsRestrictedChannel", R.string.ForwardsRestrictedChannel) : LocaleController.getString("ForwardsRestrictedGroup", R.string.ForwardsRestrictedGroup));
+                    showSimpleToast(fragment, args!=null && args.length>=1 && (Boolean)args[0] ? LocaleController.getString("ForwardsRestrictedChannel", R.string.ForwardsRestrictedChannel) : LocaleController.getString("ForwardsRestrictedGroup", R.string.ForwardsRestrictedGroup));
                     break;
             }
         } else if (request instanceof TLRPC.TL_messages_importChatInvite) {
