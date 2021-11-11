@@ -1553,7 +1553,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         } else if (!forceHistoryEmpty) {
             loading = true;
         }
-        if (isThreadChat()) {
+		int dateOffset=getArguments().getInt("date_offset");
+		if (isThreadChat()) {
             if (highlightMessageId == startLoadFromMessageId) {
                 needSelectFromMessageId = true;
             }
@@ -1565,7 +1566,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 }
                 getMessagesController().loadPeerSettings(currentUser, currentChat);
 
-                if (startLoadFromMessageId == 0) {
+                if (startLoadFromMessageId == 0 && dateOffset==0) {
                     SharedPreferences sharedPreferences = MessagesController.getNotificationsSettings(currentAccount);
                     int messageId = sharedPreferences.getInt("diditem" + dialog_id, 0);
                     if (messageId != 0) {
@@ -1610,7 +1611,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             forwardEndReached[0] = forwardEndReached[1] = true;
             firstLoading = false;
         }
-        int dateOffset=getArguments().getInt("date_offset");
         if (chatMode != MODE_PINNED && !forceHistoryEmpty) {
             waitingForLoad.add(lastLoadIndex);
             if (startLoadFromMessageId != 0 && (!isThreadChat() || startLoadFromMessageId == highlightMessageId)) {
