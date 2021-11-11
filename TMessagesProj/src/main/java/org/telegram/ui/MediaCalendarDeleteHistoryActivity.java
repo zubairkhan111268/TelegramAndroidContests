@@ -421,6 +421,8 @@ public class MediaCalendarDeleteHistoryActivity extends BaseFragment {
     	    return false;
         if(!actionModeActive){
         	previewDay=LocalDate.of(year, month+1, day);
+        	if(previewDay.isAfter(LocalDate.now()))
+        	    return false;
 
             Bundle args = new Bundle();
             if (DialogObject.isUserDialog(dialogId)) {
@@ -618,6 +620,8 @@ public class MediaCalendarDeleteHistoryActivity extends BaseFragment {
     }
 
     private void selectDay(LocalDate day){
+        if(day.isAfter(LocalDate.now()))
+            return;
         deselecting=false;
         if(!actionModeActive){
             startActionMode();
