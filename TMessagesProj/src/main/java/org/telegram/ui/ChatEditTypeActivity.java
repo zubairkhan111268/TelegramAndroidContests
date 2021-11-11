@@ -511,9 +511,9 @@ public class ChatEditTypeActivity extends BaseFragment implements NotificationCe
     private boolean trySetNoForwards(){
         if(getParentActivity()==null)
             return false;
-        if(restrictSaving!=currentChat.noforwards){
+        if((restrictSaving && isPrivate)!=currentChat.noforwards){
             TLRPC.TL_messages_toggleNoForwards req=new TLRPC.TL_messages_toggleNoForwards();
-            req.enabled=restrictSaving;
+            req.enabled=restrictSaving && isPrivate;
             req.peer=MessagesController.getInputPeer(currentChat);
             getConnectionsManager().sendRequest(req, (response, error)->{
                 if(error==null){
@@ -645,7 +645,11 @@ public class ChatEditTypeActivity extends BaseFragment implements NotificationCe
                 manageLinksInfoCell.setText(LocaleController.getString("ManageLinksInfoHelp", R.string.ManageLinksInfoHelp));
             } else {
                 typeInfoCell.setBackgroundDrawable(checkTextView.getVisibility() == View.VISIBLE ? null : Theme.getThemedDrawable(typeInfoCell.getContext(), R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
+                manageLinksInfoCell.setBackground(Theme.getThemedDrawable(typeInfoCell.getContext(), R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow));
+                manageLinksInfoCell.setText("");
             }
+            savingContentLayout.setVisibility(isPrivate ? View.VISIBLE : View.GONE);
+            savingContentExplanationCell.setVisibility(isPrivate ? View.VISIBLE : View.GONE);
         }
         radioButtonCell1.setChecked(!isPrivate, true);
         radioButtonCell2.setChecked(isPrivate, true);
