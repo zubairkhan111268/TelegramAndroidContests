@@ -583,6 +583,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             if (delegate == null || parentActivity == null) {
                 return;
             }
+            if(sendAsChooserShown)
+                sendAsChooser.dismiss(null);
             delegate.onPreAudioVideoRecord();
             calledRecordRunnable = true;
             recordAudioVideoRunnableStarted = false;
@@ -3825,6 +3827,11 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                 }
             }
         }
+    }
+
+    public void dismissSendAsIfVisible(){
+        if(sendAsChooserShown)
+            sendAsChooser.dismiss(null);
     }
 
     private void showSendAsChannel(){

@@ -6146,6 +6146,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         mentionListView.setAdapter(mentionsAdapter = new MentionsAdapter(context, false, dialog_id, threadMessageId, new MentionsAdapter.MentionsAdapterDelegate() {
             @Override
             public void needChangePanelVisibility(boolean show) {
+            	chatActivityEnterView.dismissSendAsIfVisible();
                 if ((mentionsAdapter.isStickers() || mentionsAdapter.isBotContext()) && mentionsAdapter.isMediaLayout()) {
                     mentionListView.setLayoutManager(mentionGridLayoutManager);
                 } else {

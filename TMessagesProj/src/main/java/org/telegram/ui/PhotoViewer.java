@@ -10577,6 +10577,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         if(parentChat.noforwards){
             menuItem.hideSubItem(gallery_menu_save);
             menuItem.hideSubItem(gallery_menu_savegif);
+            menuItem.hideSubItem(gallery_menu_share);
             shareButton.setVisibility(View.GONE);
             sendItem.setVisibility(View.GONE);
         }else{
@@ -10584,6 +10585,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 menuItem.showSubItem(gallery_menu_savegif);
             }else{
                 menuItem.showSubItem(gallery_menu_save);
+                if(videoPlayerControlVisible && pageBlocksAdapter==null)
+                    menuItem.showSubItem(gallery_menu_share);
             }
             shareButton.setVisibility(View.VISIBLE);
             sendItem.setVisibility(View.VISIBLE);
