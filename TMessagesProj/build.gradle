@@ -46,7 +46,8 @@ android {
     buildToolsVersion '31.0.0'
     ndkVersion "21.4.7075529"
 
-    defaultConfig.applicationId = "org.telegram.messenger"
+//    defaultConfig.applicationId = "org.telegram.messenger"
+    defaultConfig.applicationId = "me.grishka.tgcontest_nov2021"
 
     sourceSets.main.jniLibs.srcDirs = ['./jni/']
 
@@ -94,7 +95,7 @@ android {
             debuggable true
             jniDebuggable true
             signingConfig signingConfigs.debug
-            applicationIdSuffix ".beta"
+//            applicationIdSuffix ".beta"
             minifyEnabled false
             shrinkResources false
             multiDexEnabled true
