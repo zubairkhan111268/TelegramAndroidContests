@@ -19489,6 +19489,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
 
 			ChatMessagePopupMenu menu=new ChatMessagePopupMenu(this, message, groupedMessages, type, single, allowChatActions, allowUnpin, allowPin, allowEdit);
+            if(!menu.populateItems())
+            	return;
 			menu.setListener(new ChatMessagePopupMenu.PopupMenuListener(){
 				@Override
 				public void onOptionSelected(ChatMessagePopupMenu.Option option){

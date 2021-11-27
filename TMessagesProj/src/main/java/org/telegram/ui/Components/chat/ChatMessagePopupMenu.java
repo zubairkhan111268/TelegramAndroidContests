@@ -102,15 +102,13 @@ public class ChatMessagePopupMenu{
 		this.allowUnpin=allowUnpin;
 		this.allowPin=allowPin;
 		this.allowEdit=allowEdit;
-
-		populateItems();
 	}
 
 	public void setListener(PopupMenuListener listener){
 		this.listener=listener;
 	}
 
-	public void populateItems(){
+	public boolean populateItems(){
 
 		TLRPC.Chat currentChat=fragment.getCurrentChat();
 		TLRPC.EncryptedChat currentEncryptedChat=fragment.getCurrentEncryptedChat();
@@ -337,6 +335,7 @@ public class ChatMessagePopupMenu{
 				}
 			}
 		}
+		return !options.isEmpty();
 	}
 
 	public void show(View v, float x, float y){
