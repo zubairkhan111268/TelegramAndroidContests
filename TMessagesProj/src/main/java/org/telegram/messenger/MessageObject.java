@@ -207,6 +207,30 @@ public class MessageObject {
             " . "
     };
 
+    public static CharSequence getMessageCaption(MessageObject messageObject, GroupedMessages group) {
+        String restrictionReason = MessagesController.getRestrictionReason(messageObject.messageOwner.restriction_reason);
+        if (!TextUtils.isEmpty(restrictionReason)) {
+            return restrictionReason;
+        }
+        if (messageObject.caption != null) {
+            return messageObject.caption;
+        }
+        if (group == null) {
+            return null;
+        }
+        CharSequence caption = null;
+        for (int a = 0, N = group.messages.size(); a < N; a++) {
+            MessageObject message = group.messages.get(a);
+            if (message.caption != null) {
+                if (caption != null) {
+                    return null;
+                }
+                caption = message.caption;
+            }
+        }
+        return caption;
+    }
+
     public int getEmojiOnlyCount() {
         return emojiOnlyCount;
     }
