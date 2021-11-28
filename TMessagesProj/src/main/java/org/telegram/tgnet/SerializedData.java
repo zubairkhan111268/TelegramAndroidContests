@@ -13,12 +13,14 @@ import org.telegram.messenger.FileLog;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 
-public class SerializedData extends AbstractSerializedData {
+public class SerializedData extends AbstractSerializedData implements Closeable{
     protected boolean isOut = true;
     private ByteArrayOutputStream outbuf;
     private DataOutputStream out;
@@ -578,5 +580,10 @@ public class SerializedData extends AbstractSerializedData {
         } catch (Exception e) {
             return Integer.MAX_VALUE;
         }
+    }
+
+    @Override
+    public void close() throws IOException{
+        cleanup();
     }
 }

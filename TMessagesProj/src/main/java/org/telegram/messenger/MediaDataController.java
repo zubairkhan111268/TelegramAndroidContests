@@ -32,6 +32,7 @@ import android.text.Spanned;
 import android.text.SpannedString;
 import android.text.TextUtils;
 import android.text.style.CharacterStyle;
+import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -57,6 +58,7 @@ import org.telegram.ui.Components.URLSpanUserMention;
 import org.telegram.ui.LaunchActivity;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -191,6 +193,11 @@ public class MediaDataController extends BaseController {
     private boolean loadingFeaturedStickers;
     private boolean featuredStickersLoaded;
 
+    private boolean loadingReactions, reactionsLoaded;
+    private long reactionsLoadDate;
+    private int reactionsHash;
+    private List<TLRPC.TL_availableReaction> reactions=Collections.emptyList();
+
     private TLRPC.Document greetingsSticker;
 
     public void cleanup() {
@@ -226,6 +233,8 @@ public class MediaDataController extends BaseController {
         featuredStickersLoaded = false;
         loadingRecentGifs = false;
         recentGifsLoaded = false;
+        reactionsLoaded=false;
+        loadingReactions=false;
 
         currentFetchingEmoji.clear();
         if (Build.VERSION.SDK_INT >= 25) {
@@ -265,6 +274,52 @@ public class MediaDataController extends BaseController {
         if (!loadingFeaturedStickers && (!featuredStickersLoaded || Math.abs(System.currentTimeMillis() / 1000 - loadFeaturedDate) >= 60 * 60)) {
             loadFeaturedStickers(true, false);
         }
+    }
+
+    public void checkReactions(){
+        if(!loadingReactions && !reactionsLoaded){
+            SharedPreferences prefs=MessagesController.getEmojiSettings(currentAccount);
+            if(prefs.contains("reactions")){
+                reactionsLoadDate=prefs.getLong("reactionsLoadDate", 0);
+                try(SerializedData sd=new SerializedData(Base64.decode(prefs.getString("reactions", ""), 0))){
+                    TLRPC.messages_AvailableReactions _res=TLRPC.messages_AvailableReactions.TLdeserialize(sd, sd.readInt32(false), false);
+                    if(_res instanceof TLRPC.TL_messages_availableReactions){
+                        reactionsLoaded=true;
+                        TLRPC.TL_messages_availableReactions res=(TLRPC.TL_messages_availableReactions) _res;
+                        reactionsHash=res.hash;
+                        reactions=res.reactions;
+                    }
+                }catch(IOException ignore){}
+            }
+        }
+        if(!loadingReactions && (!reactionsLoaded || System.currentTimeMillis()-reactionsLoadDate>3600_000L)){
+            loadingReactions=true;
+            TLRPC.TL_messages_getAvailableReactions req=new TLRPC.TL_messages_getAvailableReactions();
+            req.hash=reactionsHash;
+            getConnectionsManager().sendRequest(req, (_res, err)->{
+                loadingReactions=false;
+                if(_res!=null){
+                    SharedPreferences prefs=MessagesController.getEmojiSettings(currentAccount);
+                    reactionsLoadDate=System.currentTimeMillis();
+                    if(_res instanceof TLRPC.TL_messages_availableReactions){
+                        reactionsLoaded=true;
+                        TLRPC.TL_messages_availableReactions res=(TLRPC.TL_messages_availableReactions) _res;
+                        reactionsHash=res.hash;
+                        reactions=res.reactions;
+                        try(SerializedData sd=new SerializedData()){
+                            res.serializeToStream(sd);
+                            prefs.edit().putLong("reactionsLoadDate", reactionsLoadDate).putString("reactions", Base64.encodeToString(sd.toByteArray(), 0)).apply();
+                        }catch(IOException ignore){}
+                    }else{
+                        prefs.edit().putLong("reactionsLoadDate", reactionsLoadDate).apply();
+                    }
+                }
+            });
+        }
+    }
+
+    public List<TLRPC.TL_availableReaction> getAvailableReactions(){
+        return reactions;
     }
 
     public ArrayList<TLRPC.Document> getRecentStickers(int type) {

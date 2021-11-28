@@ -159,6 +159,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -241,6 +242,19 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
 
     private static final int PLAY_SERVICES_REQUEST_CHECK_SETTINGS = 140;
     public static final int SCREEN_CAPTURE_REQUEST_CODE = 520;
+
+    public LaunchActivity(){
+        if(Build.VERSION.SDK_INT>=17){
+            Locale locale=LocaleController.getInstance().getCurrentLocale();
+            if(locale!=null){
+                Configuration cfg=new Configuration();
+                cfg.locale=locale;
+                try{
+                    applyOverrideConfiguration(cfg);
+                }catch(Throwable ignore){}
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

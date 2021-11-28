@@ -15,12 +15,15 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
 import android.view.View;
 
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.SecureDocument;
 import org.telegram.tgnet.TLObject;
+
+import androidx.annotation.Nullable;
 
 public class BackupImageView extends View {
 
@@ -30,6 +33,11 @@ public class BackupImageView extends View {
 
     public BackupImageView(Context context) {
         super(context);
+        imageReceiver = new ImageReceiver(this);
+    }
+
+    public BackupImageView(Context context, @Nullable AttributeSet attrs){
+        super(context, attrs);
         imageReceiver = new ImageReceiver(this);
     }
 
