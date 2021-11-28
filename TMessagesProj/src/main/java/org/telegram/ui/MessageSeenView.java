@@ -177,7 +177,7 @@ public class MessageSeenView extends FrameLayout {
                 updateView();
             }
         }));
-        setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector), AndroidUtilities.dp(4), AndroidUtilities.dp(4)));
+        setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector), 2));
         setEnabled(false);
     }
 
