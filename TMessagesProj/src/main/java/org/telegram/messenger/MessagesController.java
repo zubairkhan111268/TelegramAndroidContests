@@ -132,6 +132,8 @@ public class MessagesController extends BaseController implements NotificationCe
     private LongSparseArray<ArrayList<Integer>> channelViewsToSend = new LongSparseArray<>();
     private LongSparseArray<SparseArray<MessageObject>> pollsToCheck = new LongSparseArray<>();
     private int pollsToCheckSize;
+    private LongSparseArray<SparseArray<MessageObject>> reactionsToCheck = new LongSparseArray<>();
+    private int reactionsToCheckSize;
     private long lastViewsCheckTime;
 
     public ArrayList<DialogFilter> dialogFilters = new ArrayList<>();
@@ -2570,6 +2572,8 @@ public class MessagesController extends BaseController implements NotificationCe
         channelViewsToSend.clear();
         pollsToCheck.clear();
         pollsToCheckSize = 0;
+        reactionsToCheck.clear();
+        reactionsToCheckSize=0;
         dialogsServerOnly.clear();
         dialogsForward.clear();
         allDialogs.clear();
@@ -2785,6 +2789,13 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (int a = 0, N = array.size(); a < N; a++) {
                         MessageObject object = array.valueAt(a);
                         object.pollVisibleOnScreen = false;
+                    }
+                }
+                array = reactionsToCheck.get(dialogId);
+                if (array != null) {
+                    for (int a = 0, N = array.size(); a < N; a++) {
+                        MessageObject object = array.valueAt(a);
+                        object.reactionVisibleOnScreen = false;
                     }
                 }
             }
@@ -5430,6 +5441,51 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                     pollsToCheckSize = pollsToCheck.size();
+                });
+            }
+            if(reactionsToCheckSize>0){
+                AndroidUtilities.runOnUIThread(() -> {
+                    long time = SystemClock.elapsedRealtime();
+                    for (int a = 0, N = reactionsToCheck.size(); a < N; a++) {
+                        SparseArray<MessageObject> array = reactionsToCheck.valueAt(a);
+                        if (array == null) {
+                            continue;
+                        }
+                        TLRPC.TL_messages_getMessagesReactions req=null;
+                        for (int b = 0, N2 = array.size(); b < N2; b++) {
+                            MessageObject messageObject = array.valueAt(b);
+                            TLRPC.TL_messageMediaPoll mediaPoll = (TLRPC.TL_messageMediaPoll) messageObject.messageOwner.media;
+                            int timeout = 30000;
+                            if (Math.abs(time - messageObject.reactionLastCheckTime) < timeout) {
+                                if (!messageObject.reactionVisibleOnScreen) {
+                                    array.remove(messageObject.getId());
+                                    N2--;
+                                    b--;
+                                }
+                            } else {
+                                messageObject.reactionLastCheckTime = time;
+                                if(req==null){
+                                    req=new TLRPC.TL_messages_getMessagesReactions();
+                                    req.peer=getInputPeer(messageObject.getDialogId());
+                                }
+                                req.id.add(messageObject.getId());
+                            }
+                        }
+                        if(req!=null){
+                            getConnectionsManager().sendRequest(req, (response, error) -> {
+                                if (error == null) {
+                                    TLRPC.Updates updates = (TLRPC.Updates) response;
+                                    processUpdates(updates, false);
+                                }
+                            });
+                        }
+                        if (array.size() == 0) {
+                            reactionsToCheck.remove(reactionsToCheck.keyAt(a));
+                            N--;
+                            a--;
+                        }
+                    }
+                    reactionsToCheckSize = reactionsToCheck.size();
                 });
             }
         }
@@ -8507,6 +8563,40 @@ public class MessagesController extends BaseController implements NotificationCe
         } else if (minExpireTime < 5) {
             lastViewsCheckTime = Math.min(lastViewsCheckTime, System.currentTimeMillis() - (5 - minExpireTime) * 1000);
         }
+    }
+
+    public void addToReactionsQueue(long dialogId, ArrayList<MessageObject> visibleObjects){
+        SparseArray<MessageObject> array = reactionsToCheck.get(dialogId);
+        if (array == null) {
+            array = new SparseArray<>();
+            reactionsToCheck.put(dialogId, array);
+            reactionsToCheckSize++;
+        }
+        for (int a = 0, N = array.size(); a < N; a++) {
+            MessageObject object = array.valueAt(a);
+            object.reactionVisibleOnScreen = false;
+        }
+        int time = getConnectionsManager().getCurrentTime();
+        int minExpireTime = Integer.MAX_VALUE;
+        boolean hasExpiredPolls = false;
+        for (int a = 0, N = visibleObjects.size(); a < N; a++) {
+            MessageObject messageObject = visibleObjects.get(a);
+            if (!messageObject.hasReactions()) {
+                continue;
+            }
+            int id = messageObject.getId();
+            MessageObject object = array.get(id);
+            if (object != null) {
+                object.reactionVisibleOnScreen = true;
+            } else {
+                array.put(id, messageObject);
+            }
+        }
+//        if (hasExpiredPolls) {
+//            lastViewsCheckTime = 0;
+//        } else if (minExpireTime < 5) {
+//            lastViewsCheckTime = Math.min(lastViewsCheckTime, System.currentTimeMillis() - (5 - minExpireTime) * 1000);
+//        }
     }
 
     public void markMessageContentAsRead(MessageObject messageObject) {

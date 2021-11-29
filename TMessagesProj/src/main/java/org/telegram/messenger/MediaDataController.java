@@ -322,6 +322,14 @@ public class MediaDataController extends BaseController {
         return reactions;
     }
 
+    public TLRPC.TL_availableReaction getReaction(String emoji){
+        for(TLRPC.TL_availableReaction reaction:reactions){
+            if(reaction.reaction.equals(emoji))
+                return reaction;
+        }
+        return null;
+    }
+
     public ArrayList<TLRPC.Document> getRecentStickers(int type) {
         ArrayList<TLRPC.Document> arrayList = recentStickers[type];
         return new ArrayList<>(arrayList.subList(0, Math.min(arrayList.size(), 20)));

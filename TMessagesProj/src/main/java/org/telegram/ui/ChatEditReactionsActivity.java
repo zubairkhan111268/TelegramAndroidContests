@@ -32,6 +32,7 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SeparatorBackgroundDrawable;
 import org.telegram.ui.Components.Switch;
+import org.telegram.ui.Components.chat.ReactionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -258,20 +259,7 @@ public class ChatEditReactionsActivity extends BaseFragment{
 		public void bind(TLRPC.TL_availableReaction reaction, boolean last){
 			text.setText(reaction.title);
 			toggle.setChecked(selectedReactions.contains(reaction.reaction), false);
-
-			TLRPC.Document document=reaction.static_icon;
-			TLRPC.PhotoSize thumb = FileLoader.getClosestPhotoSizeWithSize(document.thumbs, 90);
-			SvgHelper.SvgDrawable svgThumb = DocumentObject.getSvgThumb(document, Theme.key_windowBackgroundGray, 1.0f);
-			if (svgThumb != null) {
-				if (thumb != null) {
-					image.setImage(ImageLocation.getForDocument(thumb, document), null, "webp", svgThumb, reaction);
-				} else {
-					image.setImage(ImageLocation.getForDocument(document), null, "webp", svgThumb, reaction);
-				}
-			} else {
-				image.setImage(ImageLocation.getForDocument(thumb, document), null, "webp", null, reaction);
-			}
-
+			ReactionUtils.loadWebpIntoImageView(reaction.static_icon, reaction, image);
 			bg.setDrawSeparator(!last);
 		}
 	}

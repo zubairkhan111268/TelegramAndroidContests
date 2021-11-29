@@ -113,6 +113,8 @@ public class MessageObject {
     public boolean viewsReloaded;
     public boolean pollVisibleOnScreen;
     public long pollLastCheckTime;
+    public boolean reactionVisibleOnScreen;
+    public long reactionLastCheckTime;
     public int wantedBotKeyboardWidth;
     public boolean attachPathExists;
     public boolean mediaExists;
@@ -2155,6 +2157,17 @@ public class MessageObject {
 
     public boolean hasReactions() {
         return messageOwner.reactions != null && !messageOwner.reactions.results.isEmpty();
+    }
+
+    public int getAllReactionsCount(){
+        if(hasReactions()){
+            int total=0;
+            for(TLRPC.TL_reactionCount count:messageOwner.reactions.results){
+                total+=count.count;
+            }
+            return total;
+        }
+        return 0;
     }
 
     public static void updatePollResults(TLRPC.TL_messageMediaPoll media, TLRPC.PollResults results) {

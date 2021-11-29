@@ -1007,6 +1007,17 @@ public class LocaleController {
         return formatString(param, key + "_other", resourceId, plural);
     }
 
+    public static String formatPluralString(String key, Object... args) {
+        if (key == null || key.length() == 0 || getInstance().currentPluralRules == null) {
+            return "LOC_ERR:" + key;
+        }
+        int plural=(Integer)args[0];
+        String param = getInstance().stringForQuantity(getInstance().currentPluralRules.quantityForNumber(plural));
+        param = key + "_" + param;
+        int resourceId = ApplicationLoader.applicationContext.getResources().getIdentifier(param, "string", ApplicationLoader.applicationContext.getPackageName());
+        return formatString(param, key + "_other", resourceId, args);
+    }
+
     public static String formatPluralStringComma(String key, int plural) {
         try {
             if (key == null || key.length() == 0 || getInstance().currentPluralRules == null) {

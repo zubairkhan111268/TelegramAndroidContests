@@ -453,14 +453,17 @@ public class ChatMessagePopupMenu{
 			(ChatObject.isMegagroup(fragment.getCurrentChat()) || !ChatObject.isChannel(fragment.getCurrentChat())) && fragment.getCurrentChatInfo() != null && fragment.getCurrentChatInfo().participants_count < 50
 			&& !(selectedObject.messageOwner.action instanceof TLRPC.TL_messageActionChatJoinedByRequest);
 
-		if (showMessageSeen) {
+		boolean showReactionList=selectedObject.hasReactions() && fragment.getCurrentChat()!=null && !ChatObject.isChannelAndNotMegaGroup(fragment.getCurrentChat()) &&
+				!(fragment.getCurrentChatInfo().linked_chat_id!=0 && selectedObject.messageOwner.from_id.channel_id==fragment.getCurrentChatInfo().linked_chat_id);
+
+		if (showMessageSeen || showReactionList) {
 			View divider=new View(getParentActivity());
 			divider.setBackground(new LayerDrawable(new Drawable[]{
 					new ColorDrawable(themeDelegate.getColor(Theme.key_windowBackgroundGray)),
 					Theme.getThemedDrawable(getParentActivity(), R.drawable.greydivider, themeDelegate.getColor(Theme.key_windowBackgroundGrayShadow))
 			}));
 			menuContent.addView(divider, 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
-			messageSeenView = new MessageSeenView(contentView.getContext(), fragment.getCurrentAccount(), selectedObject, fragment.getCurrentChat());
+			messageSeenView = new MessageSeenView(contentView.getContext(), fragment.getCurrentAccount(), selectedObject, fragment.getCurrentChat(), showMessageSeen, showReactionList);
 			menuContent.addView(messageSeenView, 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
 
 			messageSeenView.setOnClickListener(this::onMessageSeenClick);

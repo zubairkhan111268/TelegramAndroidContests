@@ -16,6 +16,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -29,6 +30,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
@@ -44,6 +46,7 @@ import org.telegram.ui.Components.FlickerLoadingView;
 import org.telegram.ui.Components.HideViewAfterAnimation;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
+import org.telegram.ui.Components.chat.ReactionUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,12 +59,17 @@ public class MessageSeenView extends FrameLayout {
     AvatarsImageView avatarsImageView;
     TextView titleView;
     ImageView iconView;
+    BackupImageView reactionIconView;
     int currentAccount;
     boolean isVoice;
+    private boolean isReactions;
+    private boolean haveSeen;
+    private int totalReactions;
+    private int seenCount;
 
     FlickerLoadingView flickerLoadingView;
 
-    public MessageSeenView(@NonNull Context context, int currentAccount, MessageObject messageObject, TLRPC.Chat chat) {
+    public MessageSeenView(@NonNull Context context, int currentAccount, MessageObject messageObject, TLRPC.Chat chat, boolean canLoadSeen, boolean canLoadReactions) {
         super(context);
         this.currentAccount = currentAccount;
         isVoice = (messageObject.isRoundVideo() || messageObject.isVoice());
@@ -90,9 +98,20 @@ public class MessageSeenView extends FrameLayout {
 
         iconView = new ImageView(context);
         addView(iconView, LayoutHelper.createFrame(24, 24, Gravity.LEFT | Gravity.CENTER_VERTICAL, 11, 0, 0, 0));
-        Drawable drawable = ContextCompat.getDrawable(context, isVoice ? R.drawable.msg_played : R.drawable.msg_seen).mutate();
+        int icon;
+        if(canLoadReactions){
+            icon=R.drawable.msg_reactions;
+            isReactions=true;
+            totalReactions=messageObject.getAllReactionsCount();
+        }else{
+            icon=isVoice ? R.drawable.msg_played : R.drawable.msg_seen;
+        }
+        Drawable drawable = ContextCompat.getDrawable(context, icon).mutate();
         drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_actionBarDefaultSubmenuItemIcon), PorterDuff.Mode.MULTIPLY));
         iconView.setImageDrawable(drawable);
+
+        setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector), 2));
+        setEnabled(false);
 
         avatarsImageView.setAlpha(0);
         titleView.setAlpha(0);
@@ -101,84 +120,113 @@ public class MessageSeenView extends FrameLayout {
             fromId = messageObject.messageOwner.from_id.user_id;
         }
         long finalFromId = fromId;
-        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
-            FileLog.e("MessageSeenView request completed");
-            if (error == null) {
-                TLRPC.Vector vector = (TLRPC.Vector) response;
-                ArrayList<Long> unknownUsers = new ArrayList<>();
-                HashMap<Long, TLRPC.User> usersLocal = new HashMap<>();
-                ArrayList<Long> allPeers = new ArrayList<>();
-                for (int i = 0, n = vector.objects.size(); i < n; i++) {
-                    Object object = vector.objects.get(i);
-                    if (object instanceof Long) {
-                        Long peerId = (Long) object;
-                        if (finalFromId == peerId) {
-                            continue;
-                        }
-                        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(peerId);
-                        allPeers.add(peerId);
-                        if (true || user == null) {
-                            unknownUsers.add(peerId);
-                        } else {
-                            usersLocal.put(peerId, user);
-                        }
-                    }
+        if(canLoadReactions && !canLoadSeen){
+            if(messageObject.messageOwner.reactions.recent_reactons!=null && !messageObject.messageOwner.reactions.recent_reactons.isEmpty()){
+                for(TLRPC.TL_messageUserReaction reaction:messageObject.messageOwner.reactions.recent_reactons){
+                    peerIds.add(reaction.user_id);
+                    users.add(MessagesController.getInstance(currentAccount).getUser(reaction.user_id));
                 }
-
-                if (unknownUsers.isEmpty()) {
-                    for (int i = 0; i < allPeers.size(); i++) {
-                        peerIds.add(allPeers.get(i));
-                        users.add(usersLocal.get(allPeers.get(i)));
-                    }
-                    updateView();
-                } else {
-                    if (ChatObject.isChannel(chat)) {
-                        TLRPC.TL_channels_getParticipants usersReq = new TLRPC.TL_channels_getParticipants();
-                        usersReq.limit = 50;
-                        usersReq.offset = 0;
-                        usersReq.filter = new TLRPC.TL_channelParticipantsRecent();
-                        usersReq.channel = MessagesController.getInstance(currentAccount).getInputChannel(chat.id);
-                        ConnectionsManager.getInstance(currentAccount).sendRequest(usersReq, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
-                            if (response1 != null) {
-                                TLRPC.TL_channels_channelParticipants users = (TLRPC.TL_channels_channelParticipants) response1;
-                                for (int i = 0; i < users.users.size(); i++) {
-                                    TLRPC.User user = users.users.get(i);
-                                    MessagesController.getInstance(currentAccount).putUser(user, false);
-                                    usersLocal.put(user.id, user);
-                                }
-                                for (int i = 0; i < allPeers.size(); i++) {
-                                    peerIds.add(allPeers.get(i));
-                                    this.users.add(usersLocal.get(allPeers.get(i)));
-                                }
-                            }
-                            updateView();
-                        }));
-                    } else {
-                        TLRPC.TL_messages_getFullChat usersReq = new TLRPC.TL_messages_getFullChat();
-                        usersReq.chat_id = chat.id;
-                        ConnectionsManager.getInstance(currentAccount).sendRequest(usersReq, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
-                            if (response1 != null) {
-                                TLRPC.TL_messages_chatFull chatFull = (TLRPC.TL_messages_chatFull) response1;
-                                for (int i = 0; i < chatFull.users.size(); i++) {
-                                    TLRPC.User user = chatFull.users.get(i);
-                                    MessagesController.getInstance(currentAccount).putUser(user, false);
-                                    usersLocal.put(user.id, user);
-                                }
-                                for (int i = 0; i < allPeers.size(); i++) {
-                                    peerIds.add(allPeers.get(i));
-                                    this.users.add(usersLocal.get(allPeers.get(i)));
-                                }
-                            }
-                            updateView();
-                        }));
-                    }
-                }
-            } else {
                 updateView();
+                if(messageObject.messageOwner.reactions.recent_reactons.size()==1){
+                    TLRPC.TL_messageUserReaction reaction=messageObject.messageOwner.reactions.recent_reactons.get(0);
+                    iconView.setVisibility(GONE);
+                    reactionIconView = new BackupImageView(context);
+                    addView(reactionIconView, LayoutHelper.createFrame(22, 22, Gravity.LEFT | Gravity.CENTER_VERTICAL, 12, 0, 0, 0));
+                    TLRPC.TL_availableReaction avReaction=MediaDataController.getInstance(currentAccount).getReaction(reaction.reaction);
+                    if(avReaction!=null){
+                        ReactionUtils.loadWebpIntoImageView(avReaction.static_icon, avReaction, reactionIconView);
+                    }
+                }
             }
-        }));
-        setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector), 2));
-        setEnabled(false);
+        }else{
+            if(canLoadReactions && messageObject.messageOwner.reactions.recent_reactons!=null && !messageObject.messageOwner.reactions.recent_reactons.isEmpty()){
+                for(TLRPC.TL_messageUserReaction reaction : messageObject.messageOwner.reactions.recent_reactons){
+                    peerIds.add(reaction.user_id);
+                }
+            }
+            ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error)->AndroidUtilities.runOnUIThread(()->{
+                FileLog.e("MessageSeenView request completed");
+                if(error==null){
+                	haveSeen=true;
+                    TLRPC.Vector vector=(TLRPC.Vector) response;
+                    ArrayList<Long> unknownUsers=new ArrayList<>();
+                    HashMap<Long, TLRPC.User> usersLocal=new HashMap<>();
+                    ArrayList<Long> allPeers=new ArrayList<>();
+                    seenCount=vector.objects.size();
+                    vector.objects.addAll(peerIds);
+                    peerIds.clear();
+                    for(int i=0, n=vector.objects.size(); i<n; i++){
+                        Object object=vector.objects.get(i);
+                        if(object instanceof Long){
+                            Long peerId=(Long) object;
+                            if(finalFromId==peerId){
+                                continue;
+                            }
+                            if(allPeers.contains(peerId))
+                                continue;
+                            TLRPC.User user=MessagesController.getInstance(currentAccount).getUser(peerId);
+                            allPeers.add(peerId);
+                            if(/*true ||*/ user==null){
+                                unknownUsers.add(peerId);
+                            }else{
+                                usersLocal.put(peerId, user);
+                            }
+                        }
+                    }
+
+                    if(unknownUsers.isEmpty()){
+                        for(int i=0; i<allPeers.size(); i++){
+                            peerIds.add(allPeers.get(i));
+                            users.add(usersLocal.get(allPeers.get(i)));
+                        }
+                        updateView();
+                    }else{
+                        if(ChatObject.isChannel(chat)){
+                            TLRPC.TL_channels_getParticipants usersReq=new TLRPC.TL_channels_getParticipants();
+                            usersReq.limit=50;
+                            usersReq.offset=0;
+                            usersReq.filter=new TLRPC.TL_channelParticipantsRecent();
+                            usersReq.channel=MessagesController.getInstance(currentAccount).getInputChannel(chat.id);
+                            ConnectionsManager.getInstance(currentAccount).sendRequest(usersReq, (response1, error1)->AndroidUtilities.runOnUIThread(()->{
+                                if(response1!=null){
+                                    TLRPC.TL_channels_channelParticipants users=(TLRPC.TL_channels_channelParticipants) response1;
+                                    for(int i=0; i<users.users.size(); i++){
+                                        TLRPC.User user=users.users.get(i);
+                                        MessagesController.getInstance(currentAccount).putUser(user, false);
+                                        usersLocal.put(user.id, user);
+                                    }
+                                    for(int i=0; i<allPeers.size(); i++){
+                                        peerIds.add(allPeers.get(i));
+                                        this.users.add(usersLocal.get(allPeers.get(i)));
+                                    }
+                                }
+                                updateView();
+                            }));
+                        }else{
+                            TLRPC.TL_messages_getFullChat usersReq=new TLRPC.TL_messages_getFullChat();
+                            usersReq.chat_id=chat.id;
+                            ConnectionsManager.getInstance(currentAccount).sendRequest(usersReq, (response1, error1)->AndroidUtilities.runOnUIThread(()->{
+                                if(response1!=null){
+                                    TLRPC.TL_messages_chatFull chatFull=(TLRPC.TL_messages_chatFull) response1;
+                                    for(int i=0; i<chatFull.users.size(); i++){
+                                        TLRPC.User user=chatFull.users.get(i);
+                                        MessagesController.getInstance(currentAccount).putUser(user, false);
+                                        usersLocal.put(user.id, user);
+                                    }
+                                    for(int i=0; i<allPeers.size(); i++){
+                                        peerIds.add(allPeers.get(i));
+                                        this.users.add(usersLocal.get(allPeers.get(i)));
+                                    }
+                                }
+                                updateView();
+                            }));
+                        }
+                    }
+                }else{
+                    updateView();
+                }
+            }));
+        }
     }
 
     boolean ignoreLayout;
@@ -224,9 +272,15 @@ public class MessageSeenView extends FrameLayout {
         }
 
         avatarsImageView.commitTransition(false);
-        if (peerIds.size() == 1 && users.get(0) != null) {
+        if (peerIds.size() == 1 && totalReactions<=1 && users.get(0) != null) {
             titleView.setText(ContactsController.formatName(users.get(0).first_name, users.get(0).last_name));
-        } else {
+        }else if(isReactions){
+            if(haveSeen){
+                titleView.setText(LocaleController.formatPluralString("MessageReactedAndSeen", totalReactions, seenCount));
+            }else{
+                titleView.setText(LocaleController.formatPluralString("MessageReacted", totalReactions));
+            }
+        }else {
             titleView.setText(LocaleController.formatPluralString(isVoice ? "MessagePlayed" : "MessageSeen", peerIds.size()));
         }
         titleView.animate().alpha(1f).setDuration(220).start();
