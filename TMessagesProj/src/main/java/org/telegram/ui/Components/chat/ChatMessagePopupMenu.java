@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Outline;
@@ -21,19 +22,26 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 import android.view.WindowManager;
-import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
+import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserObject;
@@ -47,21 +55,30 @@ import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimationProperties;
+import org.telegram.ui.Components.AvatarDrawable;
+import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ChatActivityEnterView;
 import org.telegram.ui.Components.CubicBezierInterpolator;
+import org.telegram.ui.Components.FlickerLoadingView;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.UndoView;
+import org.telegram.ui.Components.ViewPagerFixed;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.MessageSeenView;
 import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.SponsoredMessageInfoView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
@@ -71,8 +88,12 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.GridLayoutManagerFixed;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 public class ChatMessagePopupMenu{
+	private static final String TAG="ChatMessagePopupMenu";
+
 	private MessageObject selectedObject;
 	private MessageObject.GroupedMessages selectedObjectGroup;
 	private ChatActivity fragment;
@@ -92,7 +113,25 @@ public class ChatMessagePopupMenu{
 	private boolean isShowing;
 	private SpringAnimation showAnim;
 	private MessageSeenView messageSeenView;
+	private LayoutIgnoringFrameLayout clippingView;
+	private FrameLayout menuView;
+	private ScrollView menuScroller;
+	private LinearLayout seenContent;
+	private View scrim, whiteBg;
+	private ViewPagerFixed reactionsPager;
+	private float touchslop;
+	private float swipeBackDownX;
+	private int swipeBackPointerID;
+	private boolean swipingBack;
+	private int initialMenuViewBottom, initialClippingViewBottom;
+	private boolean animatingSeenView;
+	private VelocityTracker swipeVelocityTracker;
 
+	private int maxListHeight;
+
+	private final int classGuid=ConnectionsManager.generateClassGuid();
+	private HashMap<String, ReactionTypeLoadState> reactionsByType=new HashMap<>();
+	private ReactionTypeLoadState allReactions=new ReactionTypeLoadState();
 	private ArrayList<ChatMessagePopupMenu.Option> options = new ArrayList<>();
 
 	private ActionBarMenuSubItem menuDeleteItem;
@@ -126,6 +165,7 @@ public class ChatMessagePopupMenu{
 		this.allowEdit=allowEdit;
 
 		wm=(WindowManager)getParentActivity().getSystemService(Context.WINDOW_SERVICE);
+		touchslop=ViewConfiguration.get(getParentActivity()).getScaledTouchSlop();
 	}
 
 	public void setListener(PopupMenuListener listener){
@@ -362,6 +402,16 @@ public class ChatMessagePopupMenu{
 		return !options.isEmpty();
 	}
 
+	private View makeDivider(){
+		Theme.ResourcesProvider themeDelegate=fragment.getResourceProvider();
+		View divider=new View(getParentActivity());
+		divider.setBackground(new LayerDrawable(new Drawable[]{
+				new ColorDrawable(themeDelegate.getColor(Theme.key_windowBackgroundGray)),
+				Theme.getThemedDrawable(getParentActivity(), R.drawable.greydivider, themeDelegate.getColor(Theme.key_windowBackgroundGrayShadow))
+		}));
+		return divider;
+	}
+
 	public void show(View v, float x, float y){
 		Theme.ResourcesProvider themeDelegate=fragment.getResourceProvider();
 		SizeNotifierFrameLayout contentView=(SizeNotifierFrameLayout)fragment.getFragmentView();
@@ -371,19 +421,19 @@ public class ChatMessagePopupMenu{
 
 		windowView=new KeyInterceptingFrameLayout(getParentActivity());
 		windowView.setFitsSystemWindows(true);
+		windowView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 		windowView.setClipToPadding(false);
 		menuWrapper=new LinearLayout(getParentActivity());
 		menuWrapper.setOrientation(LinearLayout.VERTICAL);
-		FrameLayout menuView=new FrameLayout(getParentActivity());
-		ScrollView menuScroller=new ScrollView(getParentActivity());
+		menuView=new FrameLayout(getParentActivity());
+		menuScroller=new ScrollView(getParentActivity());
 		LinearLayout menuContent=new LinearLayout(getParentActivity());
 		menuContent.setOrientation(LinearLayout.VERTICAL);
 
-		FrameLayout clippingView;
 		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.LOLLIPOP){
 			clippingView=new RoundedFrameLayout(getParentActivity());
 		}else{
-			clippingView=new FrameLayout(getParentActivity());
+			clippingView=new LayoutIgnoringFrameLayout(getParentActivity());
 			clippingView.setOutlineProvider(new ViewOutlineProvider(){
 				@Override
 				public void getOutline(View view, Outline outline){
@@ -393,10 +443,12 @@ public class ChatMessagePopupMenu{
 			clippingView.setClipToOutline(true);
 		}
 		menuScroller.addView(menuContent);
-		clippingView.addView(menuScroller);
+		menuScroller.setPivotX(0);
+		menuScroller.setPivotY(0);
+		clippingView.addView(menuScroller, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 		menuView.addView(clippingView);
 		menuWrapper.addView(menuView, LayoutHelper.createLinear(220+10, LayoutHelper.WRAP_CONTENT));
-		windowView.addView(menuWrapper, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+		windowView.addView(menuWrapper, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT));
 
 		Rect backgroundPaddings=new Rect(AndroidUtilities.dp(5), AndroidUtilities.dp(5), AndroidUtilities.dp(5), AndroidUtilities.dp(5));
 		menuView.setBackground(new PopupMenuShadowDrawable(themeDelegate));
@@ -457,12 +509,7 @@ public class ChatMessagePopupMenu{
 				!(fragment.getCurrentChatInfo().linked_chat_id!=0 && selectedObject.messageOwner.from_id.channel_id==fragment.getCurrentChatInfo().linked_chat_id);
 
 		if (showMessageSeen || showReactionList) {
-			View divider=new View(getParentActivity());
-			divider.setBackground(new LayerDrawable(new Drawable[]{
-					new ColorDrawable(themeDelegate.getColor(Theme.key_windowBackgroundGray)),
-					Theme.getThemedDrawable(getParentActivity(), R.drawable.greydivider, themeDelegate.getColor(Theme.key_windowBackgroundGrayShadow))
-			}));
-			menuContent.addView(divider, 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
+			menuContent.addView(makeDivider(), 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
 			messageSeenView = new MessageSeenView(contentView.getContext(), fragment.getCurrentAccount(), selectedObject, fragment.getCurrentChat(), showMessageSeen, showReactionList);
 			menuContent.addView(messageSeenView, 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
 
@@ -511,7 +558,9 @@ public class ChatMessagePopupMenu{
 		WindowManager.LayoutParams lp=new WindowManager.LayoutParams();
 		lp.width=lp.height=WindowManager.LayoutParams.MATCH_PARENT;
 		lp.type=WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
-		lp.flags=WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR;
+		lp.flags=WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM;
+		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)
+			lp.flags|=WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR;
 		lp.format=PixelFormat.TRANSLUCENT;
 		lp.token=chatListView.getWindowToken();
 		wm.addView(windowView, lp);
@@ -559,29 +608,38 @@ public class ChatMessagePopupMenu{
 		menuWrapper.setScaleX(.5f);
 		menuWrapper.setScaleY(.5f);
 		menuWrapper.setAlpha(0f);
-		SpringAnimation anim=new SpringAnimation(menuWrapper, new FloatPropertyCompat<Object>(""){
+		menuWrapper.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
 			@Override
-			public float getValue(Object object){
-				return 0;
-			}
+			public boolean onPreDraw(){
+				menuWrapper.getViewTreeObserver().removeOnPreDrawListener(this);
 
-			@Override
-			public void setValue(Object object, float value){
-				menuWrapper.setScaleX(value/2f+.5f);
-				menuWrapper.setScaleY(value/2f+.5f);
-				menuWrapper.setAlpha(Math.min(1f, value));
-			}
-		}, 1f);
-		anim.setSpring(new SpringForce().setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY).setStiffness(500f).setFinalPosition(1f));
-		anim.setMinimumVisibleChange(DynamicAnimation.MIN_VISIBLE_CHANGE_SCALE);
-		anim.addEndListener(new DynamicAnimation.OnAnimationEndListener(){
-			@Override
-			public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity){
-				showAnim=null;
+				SpringAnimation anim=new SpringAnimation(menuWrapper, new FloatPropertyCompat<Object>(""){
+					@Override
+					public float getValue(Object object){
+						return 0;
+					}
+
+					@Override
+					public void setValue(Object object, float value){
+						menuWrapper.setScaleX(value/2f+.5f);
+						menuWrapper.setScaleY(value/2f+.5f);
+						menuWrapper.setAlpha(Math.min(1f, value));
+					}
+				}, 1f);
+				anim.setSpring(new SpringForce().setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY).setStiffness(500f).setFinalPosition(1f));
+				anim.setMinimumVisibleChange(DynamicAnimation.MIN_VISIBLE_CHANGE_SCALE);
+				anim.addEndListener(new DynamicAnimation.OnAnimationEndListener(){
+					@Override
+					public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity){
+						showAnim=null;
+					}
+				});
+				showAnim=anim;
+				anim.start();
+
+				return true;
 			}
 		});
-		showAnim=anim;
-		anim.start();
 	}
 
 	public void setPauseNotifications(boolean p){
@@ -601,6 +659,7 @@ public class ChatMessagePopupMenu{
 	}
 
 	private void afterDismiss(){
+		fragment.getConnectionsManager().cancelRequestsForGuid(classGuid);
 		SizeNotifierFrameLayout contentView=(SizeNotifierFrameLayout)fragment.getFragmentView();
 		RecyclerListView chatListView=fragment.getChatListView();
 		View pagedownButton=fragment.getPagedownButton();
@@ -667,28 +726,55 @@ public class ChatMessagePopupMenu{
 		Theme.ResourcesProvider themeDelegate=fragment.getResourceProvider();
 		SizeNotifierFrameLayout contentView=(SizeNotifierFrameLayout)fragment.getFragmentView();
 		Rect rect = new Rect();
-		if (scrimPopupWindow == null || messageSeenView.users.isEmpty()) {
+
+		if (messageSeenView.users.isEmpty()) {
 			return;
 		}
+
+		if(messageSeenView.users.size()==1){
+			openUserProfile(messageSeenView.users.get(0).id);
+			dismiss();
+			return;
+		}
+
+		if(!selectedObject.hasReactions()){ // only "seen"
+			allReactions.total=messageSeenView.users.size();
+			for(TLRPC.User user:messageSeenView.users){
+				TLRPC.TL_messageUserReaction reaction=new TLRPC.TL_messageUserReaction();
+				reaction.user_id=user.id;
+				allReactions.items.add(reaction);
+			}
+		}else if(allReactions.items.isEmpty()){
+			allReactions.total=selectedObject.getAllReactionsCount()+messageSeenView.seenUserIDs.size();
+			if(allReactions.total>10 && selectedObject.messageOwner.reactions.results.size()>1){
+				for(TLRPC.TL_reactionCount count:selectedObject.messageOwner.reactions.results){
+					ReactionTypeLoadState state=new ReactionTypeLoadState();
+					state.total=count.count;
+					reactionsByType.put(count.reaction, state);
+				}
+			}
+			loadReactions(null, 100);
+		}
+
+		prepareAndAddUserListLayout();
+
+		if(!messageSeenView.seenUserIDs.isEmpty()){
+			if (SharedConfig.messageSeenHintCount > 0 && contentView.getKeyboardHeight() < AndroidUtilities.dp(20)) {
+				Bulletin bulletin = BulletinFactory.of(fragment).createErrorBulletin(AndroidUtilities.replaceTags(LocaleController.getString("MessageSeenTooltipMessage", R.string.MessageSeenTooltipMessage)));
+				bulletin.tag = 1;
+				bulletin.setDuration(4000);
+				bulletin.show();
+				SharedConfig.updateMessageSeenHintCount(SharedConfig.messageSeenHintCount - 1);
+			}
+		}
+
+		if(!!true) return;
+
 		int totalHeight = contentView.getHeightWithKeyboard();
 		int availableHeight = totalHeight - scrimPopupY - AndroidUtilities.dp(46 + 16);
 
-		if (SharedConfig.messageSeenHintCount > 0 && contentView.getKeyboardHeight() < AndroidUtilities.dp(20)) {
-			availableHeight -= AndroidUtilities.dp(52);
-			Bulletin bulletin = BulletinFactory.of(fragment).createErrorBulletin(AndroidUtilities.replaceTags(LocaleController.getString("MessageSeenTooltipMessage", R.string.MessageSeenTooltipMessage)));
-			bulletin.tag = 1;
-			bulletin.setDuration(4000);
-			bulletin.show();
-			SharedConfig.updateMessageSeenHintCount(SharedConfig.messageSeenHintCount - 1);
-		} else if (contentView.getKeyboardHeight() > AndroidUtilities.dp(20)) {
-			availableHeight -=contentView.getKeyboardHeight() / 3f;
-		}
 		View previousPopupContentView = scrimPopupWindow.getContentView();
 
-		ActionBarMenuSubItem cell = new ActionBarMenuSubItem(getParentActivity(), true, true, themeDelegate);
-		cell.setItemHeight(44);
-		cell.setTextAndIcon(LocaleController.getString("Back", R.string.Back), R.drawable.msg_arrow_back);
-		cell.getTextView().setPadding(LocaleController.isRTL ? 0 : AndroidUtilities.dp(40), 0, LocaleController.isRTL ? AndroidUtilities.dp(40) : 0, 0);
 
 		Drawable shadowDrawable2 = ContextCompat.getDrawable(contentView.getContext(), R.drawable.popup_fixed_alert).mutate();
 		shadowDrawable2.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
@@ -740,7 +826,7 @@ public class ChatMessagePopupMenu{
 		RecyclerListView listView = messageSeenView.createListView();
 		int listViewTotalHeight = AndroidUtilities.dp(8) + AndroidUtilities.dp(44) * listView.getAdapter().getItemCount() + AndroidUtilities.dp(16);
 
-		backContainer.addView(cell);
+//		backContainer.addView(cell);
 		linearLayout.addView(backContainer);
 		linearLayout.addView(listView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 320, 0, -8, 0, 0));
 
@@ -813,14 +899,267 @@ public class ChatMessagePopupMenu{
 			if (user == null) {
 				return;
 			}
-			Bundle args = new Bundle();
-			args.putLong("user_id", user.id);
-			ProfileActivity fragment = new ProfileActivity(args);
-			ChatMessagePopupMenu.this.fragment.presentFragment(fragment);
 			if (mesageSeenUsersPopupWindow != null) {
 				mesageSeenUsersPopupWindow.dismiss();
 			}
 		});
+	}
+
+	private void prepareAndAddUserListLayout(){
+		Theme.ResourcesProvider themeDelegate=fragment.getResourceProvider();
+
+		scrim=new View(getParentActivity());
+		scrim.setBackgroundColor(0x33000000);
+		scrim.setPivotY(0);
+		clippingView.addView(scrim, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, 1));
+
+		whiteBg=new View(getParentActivity());
+		whiteBg.setBackgroundColor(themeDelegate.getColor(Theme.key_actionBarDefaultSubmenuBackground));
+		whiteBg.setPivotY(0);
+		clippingView.addView(whiteBg, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, 1));
+
+		seenContent=new LinearLayout(getParentActivity());
+		seenContent.setOrientation(LinearLayout.VERTICAL);
+		seenContent.setMotionEventSplittingEnabled(false);
+
+		ActionBarMenuSubItem cell = new ActionBarMenuSubItem(getParentActivity(), false, false, themeDelegate);
+		cell.setItemHeight(44);
+		cell.setTextAndIcon(LocaleController.getString("Back", R.string.Back), R.drawable.msg_arrow_back);
+		cell.getTextView().setPadding(LocaleController.isRTL ? 0 : AndroidUtilities.dp(43), 0, LocaleController.isRTL ? AndroidUtilities.dp(43) : 0, 0);
+		cell.setPadding(AndroidUtilities.dp(13), 0, AndroidUtilities.dp(13), 0);
+		seenContent.addView(cell);
+		seenContent.addView(makeDivider(), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
+
+		int[] loc={0,0};
+		clippingView.getLocationInWindow(loc);
+		maxListHeight=Math.min(AndroidUtilities.dp(413), windowView.getHeight()-windowView.getPaddingBottom()-loc[1]-AndroidUtilities.dp(5+8));
+		maxListHeight-=AndroidUtilities.dp(44+8);
+
+		reactionsPager=new SwipeBackViewPager(getParentActivity());
+		reactionsPager.setAdapter(new ReactionsViewPagerAdapter());
+		seenContent.addView(reactionsPager, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+		cell.setOnClickListener(v->{
+			startBackTransition(true);
+		});
+
+		clippingView.addView(seenContent, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
+		clippingView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
+			@Override
+			public boolean onPreDraw(){
+				clippingView.getViewTreeObserver().removeOnPreDrawListener(this);
+
+				scrim.setScaleY(clippingView.getHeight());
+				whiteBg.setScaleY(clippingView.getHeight());
+				seenContent.setTranslationX(seenContent.getWidth());
+				whiteBg.setTranslationX(seenContent.getWidth());
+				scrim.setAlpha(0f);
+
+				initialClippingViewBottom=clippingView.getBottom();
+				initialMenuViewBottom=menuView.getBottom();
+				animateSeenViewOpening(400, false);
+
+				return true;
+			}
+		});
+	}
+
+	private void startBackTransition(boolean animate){
+		scrim.setVisibility(View.VISIBLE);
+		whiteBg.setVisibility(View.VISIBLE);
+		menuScroller.setVisibility(View.VISIBLE);
+		clippingView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
+			@Override
+			public boolean onPreDraw(){
+				clippingView.getViewTreeObserver().removeOnPreDrawListener(this);
+				initialClippingViewBottom=clippingView.getBottom();
+				initialMenuViewBottom=menuView.getBottom();
+				int heightDiff=seenContent.getHeight()-menuScroller.getHeight();
+				if(heightDiff>0){
+					initialMenuViewBottom-=heightDiff;
+					initialClippingViewBottom-=heightDiff;
+				}
+				menuView.setBottom(initialMenuViewBottom+heightDiff);
+				clippingView.setBottom(initialClippingViewBottom+heightDiff);
+				if(animate){
+					animateSeenViewClosing(300);
+				}
+				return true;
+			}
+		});
+	}
+
+	private void endBackTransition(){
+		clippingView.setIgnoreLayout(false);
+		scrim.setAlpha(1f);
+		seenContent.setTranslationX(0f);
+		whiteBg.setTranslationX(0f);
+		menuScroller.setTranslationX(AndroidUtilities.dp(-50));
+		menuScroller.setScaleX(.9f);
+		menuScroller.setScaleY(.9f);
+		// menuView.bottom & clippingView.bottom will get reset during the next layout pass
+		scrim.setVisibility(View.GONE);
+		whiteBg.setVisibility(View.GONE);
+		menuScroller.setVisibility(View.GONE);
+	}
+
+	private void animateSeenViewOpening(long duration, boolean reopening){
+		if(animatingSeenView)
+			return;
+		int heightDiff=seenContent.getHeight()-menuScroller.getHeight();
+		if(heightDiff>0 && !reopening){
+			menuView.setBottom(initialMenuViewBottom=initialMenuViewBottom-heightDiff);
+			clippingView.setBottom(initialClippingViewBottom=initialClippingViewBottom-heightDiff);
+		}
+		animatingSeenView=true;
+		clippingView.setIgnoreLayout(true);
+
+		AnimatorSet set=new AnimatorSet();
+		set.playTogether(
+				ObjectAnimator.ofFloat(scrim, View.ALPHA, 1f),
+				ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, 0f),
+				ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, 0f),
+				ObjectAnimator.ofFloat(menuScroller, View.TRANSLATION_X, AndroidUtilities.dp(-50)),
+				ObjectAnimator.ofFloat(menuScroller, View.SCALE_X, .9f),
+				ObjectAnimator.ofFloat(menuScroller, View.SCALE_Y, .9f),
+				ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom+heightDiff),
+				ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom+heightDiff)
+		);
+		set.setDuration(duration);
+		set.setInterpolator(new CubicBezierInterpolator(.09, .13, 0, 1));
+		set.addListener(new AnimatorListenerAdapter(){
+			@Override
+			public void onAnimationEnd(Animator animation){
+				animatingSeenView=false;
+				endBackTransition();
+			}
+
+			@Override
+			public void onAnimationStart(Animator animation){
+			}
+		});
+		set.start();
+	}
+
+	private void animateSeenViewClosing(long duration){
+		if(animatingSeenView)
+			return;
+		animatingSeenView=true;
+		clippingView.setIgnoreLayout(true);
+		AnimatorSet set=new AnimatorSet();
+		set.playTogether(
+				ObjectAnimator.ofFloat(scrim, View.ALPHA, 0f),
+				ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, seenContent.getWidth()),
+				ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, seenContent.getWidth()),
+				ObjectAnimator.ofFloat(menuScroller, View.TRANSLATION_X, 0f),
+				ObjectAnimator.ofFloat(menuScroller, View.SCALE_X, 1f),
+				ObjectAnimator.ofFloat(menuScroller, View.SCALE_Y, 1f),
+				ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom),
+				ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom)
+		);
+		set.setDuration(duration);
+		set.setInterpolator(new CubicBezierInterpolator(.09, .13, 0, 1));
+		set.addListener(new AnimatorListenerAdapter(){
+			@Override
+			public void onAnimationEnd(Animator animation){
+				clippingView.setIgnoreLayout(false);
+				clippingView.removeView(scrim);
+				scrim=null;
+				clippingView.removeView(whiteBg);
+				whiteBg=null;
+				clippingView.removeView(seenContent);
+				seenContent=null;
+				reactionsPager=null;
+				animatingSeenView=false;
+			}
+
+			@Override
+			public void onAnimationStart(Animator animation){
+			}
+		});
+		set.start();
+	}
+
+	private void loadReactions(String type, int count){
+		ReactionTypeLoadState state=type==null ? allReactions : reactionsByType.get(type);
+		if(state.loading)
+			return;
+		state.loading=true;
+		TLRPC.TL_messages_getMessageReactionsList req=new TLRPC.TL_messages_getMessageReactionsList();
+		req.peer=MessagesController.getInputPeer(fragment.getCurrentChat());
+		req.id=selectedObject.getId();
+		if(type!=null){
+			req.reaction=type;
+			req.flags|=1;
+		}
+		if(state.offset!=null){
+			req.offset=state.offset;
+			req.flags|=2;
+		}
+		req.limit=count;
+		int token=fragment.getConnectionsManager().sendRequest(req, (res, err)->{
+			AndroidUtilities.runOnUIThread(()->{
+				state.loading=false;
+				if(res instanceof TLRPC.TL_messages_messageReactionsList){
+					TLRPC.TL_messages_messageReactionsList reactions=(TLRPC.TL_messages_messageReactionsList) res;
+					fragment.getMessagesController().putUsers(reactions.users, false);
+					boolean first=false;
+					if(state.offset==null){
+						first=true;
+						state.items.clear();
+					}
+					state.offset=reactions.next_offset;
+					int prevCount=state.items.size();
+					state.items.addAll(reactions.reactions);
+					int addedCount=reactions.reactions.size();
+					int removedCount=0;
+					if(reactions.next_offset==null){
+						state.fullyLoaded=true;
+						if(type==null && !messageSeenView.seenUserIDs.isEmpty()){
+							Set<Long> reactedUserIDs=reactions.reactions.stream().map(r->r.user_id).collect(Collectors.toSet());
+							for(Long id:messageSeenView.seenUserIDs){
+								if(reactedUserIDs.contains(id)){
+									state.total--;
+									removedCount++;
+									continue;
+								}
+								TLRPC.TL_messageUserReaction reaction=new TLRPC.TL_messageUserReaction();
+								reaction.user_id=id;
+								allReactions.items.add(reaction);
+								addedCount++;
+							}
+						}else{
+							state.total=state.items.size();
+						}
+					}
+					HashSet<String> affectedTypes=null;
+					if(first && type==null && !reactionsByType.isEmpty()){
+						affectedTypes=new HashSet<>();
+						for(TLRPC.TL_messageUserReaction reaction:reactions.reactions){
+							ReactionTypeLoadState typeState=reactionsByType.get(reaction.reaction);
+							if(typeState!=null && typeState.offset==null){
+								typeState.items.add(reaction);
+								affectedTypes.add(reaction.reaction);
+							}
+						}
+					}
+					if(reactionsPager!=null){
+						for(int i=0;i<reactionsPager.getChildCount();i++){
+							RecyclerListView list=(RecyclerListView) reactionsPager.getChildAt(i);
+							String adapterType=((ReactionsViewRecyclerAdapter)list.getAdapter()).type;
+							if(Objects.equals(adapterType, type)){
+								list.getAdapter().notifyItemRangeChanged(prevCount, addedCount);
+								if(removedCount>0)
+									list.getAdapter().notifyItemRangeRemoved(list.getAdapter().getItemCount()-1-removedCount, removedCount);
+							}else if(affectedTypes!=null && adapterType!=null && affectedTypes.contains(adapterType)){
+								list.getAdapter().notifyDataSetChanged();
+							}
+						}
+					}
+				}
+			});
+		});
+		fragment.getConnectionsManager().bindRequestToGuid(token, classGuid);
 	}
 
 	private Activity getParentActivity(){
@@ -829,6 +1168,13 @@ public class ChatMessagePopupMenu{
 
 	private int getThemedColor(String key){
 		return fragment.getThemedColor(key);
+	}
+
+	private void openUserProfile(long id){
+		Bundle args = new Bundle();
+		args.putLong("user_id", id);
+		ProfileActivity fragment = new ProfileActivity(args);
+		ChatMessagePopupMenu.this.fragment.presentFragment(fragment);
 	}
 
 	@DrawableRes
@@ -978,6 +1324,13 @@ public class ChatMessagePopupMenu{
 		}
 
 		@Override
+		public boolean dispatchTouchEvent(MotionEvent ev){
+			if(animatingSeenView)
+				return false;
+			return super.dispatchTouchEvent(ev);
+		}
+
+		@Override
 		public boolean onTouchEvent(MotionEvent ev){
 			if(ev.getAction()==MotionEvent.ACTION_DOWN){
 				if(isShowing)
@@ -985,5 +1338,245 @@ public class ChatMessagePopupMenu{
 			}
 			return true;
 		}
+
+		@Override
+		public WindowInsets dispatchApplyWindowInsets(WindowInsets insets){
+			if(Build.VERSION.SDK_INT<Build.VERSION_CODES.LOLLIPOP)
+				return insets;
+			setPadding(insets.getStableInsetLeft(), insets.getStableInsetTop(), insets.getStableInsetRight(), insets.getStableInsetBottom());
+			return insets.consumeStableInsets();
+		}
+	}
+
+	private class SwipeBackViewPager extends ViewPagerFixed{
+
+		public SwipeBackViewPager(@NonNull Context context){
+			super(context);
+		}
+
+		@Override
+		public boolean onInterceptTouchEvent(MotionEvent ev){
+			// super calls onTouchEvent()
+			return swipingBack || super.onInterceptTouchEvent(ev);
+		}
+
+		@Override
+		public boolean onTouchEvent(MotionEvent ev){
+			if(ev==null) // what the actual fuck?! called with null from super.requestDisallowInterceptTouchEvent
+				return super.onTouchEvent(ev);
+			boolean res=super.onTouchEvent(ev);
+			if(!animatingSeenView && (!startedTracking || getScrollProgress()==0f) && getCurrentPosition()==0){
+				if(ev.getAction()==MotionEvent.ACTION_DOWN){
+					swipeBackPointerID=ev.getPointerId(0);
+					swipeBackDownX=ev.getX();
+				}else if(ev.getAction()==MotionEvent.ACTION_MOVE){
+					if(ev.getPointerId(0)==swipeBackPointerID){
+						if(!swipingBack){
+							if(ev.getX()-swipeBackDownX>=touchslop){
+								swipingBack=true;
+								swipeBackDownX=ev.getX();
+								startBackTransition(false);
+								swipeVelocityTracker=VelocityTracker.obtain();
+								swipeVelocityTracker.addMovement(ev);
+								getParent().requestDisallowInterceptTouchEvent(true);
+							}
+						}else{
+							swipeVelocityTracker.addMovement(ev);
+							float progress=(ev.getX()+seenContent.getTranslationX()-swipeBackDownX)/seenContent.getWidth();
+							progress=Math.max(0f, Math.min(1f, progress));
+							if(progress==0f){
+								endBackTransition();
+								swipingBack=false;
+								swipeVelocityTracker.recycle();
+								swipeVelocityTracker=null;
+								return res;
+							}
+							scrim.setAlpha(1f-progress);
+							seenContent.setTranslationX(progress*seenContent.getWidth());
+							whiteBg.setTranslationX(progress*seenContent.getWidth());
+							menuScroller.setTranslationX(AndroidUtilities.dp(-50)*(1f-progress));
+							float scale=.9f+(.1f*progress);
+							menuScroller.setScaleX(scale);
+							menuScroller.setScaleY(scale);
+							int heightDiff=seenContent.getHeight()-menuScroller.getHeight();
+							menuView.setBottom(initialMenuViewBottom+Math.round(heightDiff*(1f-progress)));
+							clippingView.setBottom(initialClippingViewBottom+Math.round(heightDiff*(1f-progress)));
+						}
+						return swipingBack || res;
+					}
+				}else if(ev.getAction()==MotionEvent.ACTION_UP || ev.getAction()==MotionEvent.ACTION_CANCEL){
+					if(swipingBack){
+						swipeVelocityTracker.computeCurrentVelocity(1000);
+						float xv=swipeVelocityTracker.getXVelocity(), yv=swipeVelocityTracker.getYVelocity();
+						swipeVelocityTracker.recycle();
+						swipeVelocityTracker=null;
+						if((xv>AndroidUtilities.dp(1000) && Math.abs(xv)>Math.abs(yv)) || (ev.getX()+seenContent.getTranslationX()-swipeBackDownX)>seenContent.getWidth()/3f){
+							animateSeenViewClosing(200);
+						}else{
+							animateSeenViewOpening(250, true);
+						}
+					}
+					swipingBack=false;
+				}
+			}
+			return res;
+		}
+
+		@Override
+		protected void onScrolled(float progress){
+			super.onScrolled(progress);
+			int currentHeight=viewPages[0].getHeight();
+			int newHeight=viewPages[1].getHeight();
+			int heightDiff=newHeight-currentHeight;
+			if(heightDiff!=0){
+				clippingView.setBottom(clippingView.getTop()+getTop()+currentHeight+Math.round(heightDiff*progress));
+				menuView.setBottom(menuView.getTop()+getTop()+currentHeight+Math.round(heightDiff*progress)+menuView.getPaddingBottom()+menuView.getPaddingTop());
+			}
+		}
+	}
+
+	private class ReactionsViewPagerAdapter extends ViewPagerFixed.Adapter{
+
+		@Override
+		public int getItemCount(){
+			return reactionsByType.size()+1;
+		}
+
+		@Override
+		public View createView(int viewType){
+			RecyclerListView list=new RecyclerListView(getParentActivity());
+			ReactionsViewRecyclerAdapter adapter=new ReactionsViewRecyclerAdapter();
+			list.setAdapter(adapter);
+			list.setOnItemClickListener(adapter);
+			list.setLayoutManager(new LinearLayoutManager(getParentActivity()));
+			list.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 200));
+			return list;
+		}
+
+		@Override
+		public void bindView(View view, int position, int viewType){
+			RecyclerListView list=(RecyclerListView) view;
+			ReactionsViewRecyclerAdapter adapter=(ReactionsViewRecyclerAdapter) list.getAdapter();
+			if(position==0)
+				adapter.setReactions(allReactions, null);
+			else{
+				String type=selectedObject.messageOwner.reactions.results.get(position-1).reaction;
+				adapter.setReactions(reactionsByType.get(type), type);
+			}
+			list.getLayoutParams().height=Math.min(maxListHeight, AndroidUtilities.dp(adapter.getItemCount()*48));
+		}
+	}
+
+	private class ReactionsViewRecyclerAdapter extends RecyclerListView.SelectionAdapter implements RecyclerListView.OnItemClickListener{
+		private ReactionTypeLoadState reactions=null;
+		private String type;
+
+		@NonNull
+		@Override
+		public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType){
+			return switch(viewType){
+				case 0 -> new ReactionUserViewHolder(parent);
+				case 1 -> new LoadingReactionViewHolder();
+				default -> throw new IllegalArgumentException();
+			};
+		}
+
+		@Override
+		public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position){
+			if(position<reactions.items.size()){
+				((ReactionUserViewHolder) holder).bind(reactions.items.get(position));
+			}else{
+				((LoadingReactionViewHolder) holder).bind();
+				if(!reactions.loading){
+					loadReactions(type, type==null ? 100 : 50);
+				}
+			}
+		}
+
+		@Override
+		public int getItemCount(){
+			return reactions==null ? 0 : reactions.total;
+		}
+
+		@Override
+		public boolean isEnabled(RecyclerView.ViewHolder holder){
+			return holder instanceof ReactionUserViewHolder;
+		}
+
+		@Override
+		public int getItemViewType(int position){
+			return position>=reactions.items.size() ? 1 : 0;
+		}
+
+		@SuppressLint("NotifyDataSetChanged")
+		public void setReactions(ReactionTypeLoadState list, String type){
+			reactions=list;
+			this.type=type;
+			notifyDataSetChanged();
+		}
+
+		@Override
+		public void onItemClick(View view, int position){
+			openUserProfile(reactions.items.get(position).user_id);
+			dismiss();
+		}
+	}
+
+	private class ReactionUserViewHolder extends RecyclerView.ViewHolder{
+		private BackupImageView photo, icon;
+		private TextView name;
+		private AvatarDrawable avatarDrawable=new AvatarDrawable();
+
+		public ReactionUserViewHolder(ViewGroup list){
+			super(getParentActivity().getLayoutInflater().inflate(R.layout.reaction_list_cell, list, false));
+			photo=itemView.findViewById(R.id.photo);
+			icon=itemView.findViewById(R.id.icon);
+			name=itemView.findViewById(R.id.name);
+
+			name.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+			photo.setRoundRadius(AndroidUtilities.dp(17));
+		}
+
+		public void bind(TLRPC.TL_messageUserReaction reaction){
+			if(reaction.reaction==null){
+				icon.setVisibility(View.GONE);
+			}else{
+				TLRPC.TL_availableReaction aReaction=fragment.getMediaDataController().getReaction(reaction.reaction);
+				if(aReaction!=null){
+					ReactionUtils.loadWebpIntoImageView(aReaction.static_icon, aReaction, icon);
+					icon.setVisibility(View.VISIBLE);
+				}else{
+					icon.setVisibility(View.GONE);
+				}
+			}
+			TLRPC.User user=fragment.getMessagesController().getUser(reaction.user_id);
+			name.setText(ContactsController.formatName(user.first_name, user.last_name));
+			avatarDrawable.setInfo(user);
+			ImageLocation imageLocation = ImageLocation.getForUser(user, ImageLocation.TYPE_SMALL);
+			photo.setImage(imageLocation, "50_50", avatarDrawable, user);
+		}
+	}
+
+	public class LoadingReactionViewHolder extends RecyclerView.ViewHolder{
+		public LoadingReactionViewHolder(){
+			super(new FlickerLoadingView(getParentActivity(), fragment.getResourceProvider()));
+
+			FlickerLoadingView view=(FlickerLoadingView) itemView;
+			view.setColors(Theme.key_actionBarDefaultSubmenuBackground, Theme.key_listSelector, null);
+			view.setViewType(FlickerLoadingView.REACTION_CELL_TYPE);
+			view.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(48)));
+		}
+
+		public void bind(){
+			((FlickerLoadingView)itemView).setItemsCount(getAdapterPosition()%2);
+		}
+	}
+
+	private static class ReactionTypeLoadState{
+		public boolean loading;
+		public boolean fullyLoaded;
+		public String offset;
+		public int total;
+		public ArrayList<TLRPC.TL_messageUserReaction> items=new ArrayList<>();
 	}
 }

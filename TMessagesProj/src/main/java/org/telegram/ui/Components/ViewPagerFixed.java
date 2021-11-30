@@ -19,6 +19,7 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.util.Property;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
@@ -26,6 +27,7 @@ import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
@@ -54,7 +56,7 @@ public class ViewPagerFixed extends FrameLayout {
 
     int currentPosition;
     int nextPosition;
-    private View[] viewPages;
+    protected View[] viewPages;
     private int[] viewTypes;
 
     protected SparseArray<View> viewsByType = new SparseArray<>();
@@ -70,12 +72,14 @@ public class ViewPagerFixed extends FrameLayout {
     private float additionalOffset;
     private boolean backAnimation;
     private int maximumVelocity;
-    private boolean startedTracking;
+    protected boolean startedTracking;
     private boolean maybeStartTracking;
     private static final Interpolator interpolator = t -> {
         --t;
         return t * t * t * t * t + 1.0F;
     };
+    private ItemSelectionListener itemSelectionListener;
+    protected int dx;
 
     private final float touchSlop;
 
@@ -87,6 +91,7 @@ public class ViewPagerFixed extends FrameLayout {
         public void onAnimationUpdate(ValueAnimator valueAnimator) {
             if (tabsAnimationInProgress) {
                 float scrollProgress = Math.abs(viewPages[0].getTranslationX()) / (float) viewPages[0].getMeasuredWidth();
+                onScrolled(scrollProgress);
                 if (tabsView != null) {
                     tabsView.selectTab(nextPosition, currentPosition, 1f - scrollProgress);
                 }
@@ -134,26 +139,7 @@ public class ViewPagerFixed extends FrameLayout {
 
             @Override
             public void onPageScrolled(float progress) {
-                if (progress == 1f) {
-                    if (viewPages[1] != null) {
-                        swapViews();
-                        viewsByType.put(viewTypes[1], viewPages[1]);
-                        removeView(viewPages[1]);
-                        viewPages[0].setTranslationX(0);
-                        viewPages[1] = null;
-                    }
-                    return;
-                }
-                if (viewPages[1] == null) {
-                    return;
-                }
-                if (animatingForward) {
-                    viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth() * (1f - progress));
-                    viewPages[0].setTranslationX(-viewPages[0].getMeasuredWidth() * progress);
-                } else {
-                    viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth() * (1f - progress));
-                    viewPages[0].setTranslationX(viewPages[0].getMeasuredWidth() * progress);
-                }
+                ViewPagerFixed.this.onPageScrolled(progress);
             }
 
             @Override
@@ -241,6 +227,15 @@ public class ViewPagerFixed extends FrameLayout {
         } else {
             viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth());
         }
+        // to make sure it's called after layout
+        getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
+        	@Override
+        	public boolean onPreDraw(){
+        		getViewTreeObserver().removeOnPreDrawListener(this);
+        		onScrolled(0f);
+        		return true;
+        	}
+        });
         return true;
     }
 
@@ -314,7 +309,7 @@ public class ViewPagerFixed extends FrameLayout {
             startedTrackingX = (int) ev.getX();
             startedTrackingY = (int) ev.getY();
         } else if (ev != null && ev.getAction() == MotionEvent.ACTION_MOVE && ev.getPointerId(0) == startedTrackingPointerId) {
-            int dx = (int) (ev.getX() - startedTrackingX + additionalOffset);
+            dx = (int) (ev.getX() - startedTrackingX + additionalOffset);
             int dy = Math.abs((int) ev.getY() - startedTrackingY);
             if (startedTracking && (animatingForward && dx > 0 || !animatingForward && dx < 0)) {
                 if (!prepareForMoving(ev, dx < 0)) {
@@ -340,6 +335,7 @@ public class ViewPagerFixed extends FrameLayout {
                     viewPages[1].setTranslationX(dx - viewPages[0].getMeasuredWidth());
                 }
                 float scrollProgress = Math.abs(dx) / (float) viewPages[0].getMeasuredWidth();
+                onScrolled(scrollProgress);
                 if (tabsView != null) {
                     tabsView.selectTab(nextPosition, currentPosition, 1f - scrollProgress);
                 }
@@ -533,16 +529,89 @@ public class ViewPagerFixed extends FrameLayout {
         }
     }
 
-    protected void onItemSelected(View currentPage, View oldPage, int position, int oldPosition) {
+    public float getScrollProgress(){
+        return Math.abs(dx) / (float) viewPages[0].getMeasuredWidth();
+    }
 
+    public void setPositionAnimated(int position){
+        animatingForward = position>currentPosition;
+        nextPosition = position;
+        updateViewForIndex(1);
+
+        if (animatingForward) {
+            viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth());
+        } else {
+            viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth());
+        }
+
+		ValueAnimator tabsAnimator = ValueAnimator.ofFloat(0,1f);
+		tabsAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+			@Override
+			public void onAnimationUpdate(ValueAnimator valueAnimator) {
+				float progress = (float) valueAnimator.getAnimatedValue();
+                onPageScrolled(progress);
+			}
+		});
+		tabsAnimator.setDuration(250);
+		tabsAnimator.setInterpolator(CubicBezierInterpolator.DEFAULT);
+		tabsAnimator.addListener(new AnimatorListenerAdapter() {
+			@Override
+			public void onAnimationEnd(Animator animation) {
+				setEnabled(true);
+                onPageScrolled(1.0f);
+				invalidate();
+			}
+		});
+		tabsAnimator.start();
+	}
+
+	protected void onScrolled(float progress){
+
+    }
+
+	private void onPageScrolled(float progress){
+        onScrolled(progress);
+        if (progress == 1f) {
+            if (viewPages[1] != null) {
+                swapViews();
+                viewsByType.put(viewTypes[1], viewPages[1]);
+                removeView(viewPages[1]);
+                viewPages[0].setTranslationX(0);
+                viewPages[1] = null;
+            }
+            return;
+        }
+        if (viewPages[1] == null) {
+            return;
+        }
+        if (animatingForward) {
+            viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth() * (1f - progress));
+            viewPages[0].setTranslationX(-viewPages[0].getMeasuredWidth() * progress);
+        } else {
+            viewPages[1].setTranslationX(-viewPages[0].getMeasuredWidth() * (1f - progress));
+            viewPages[0].setTranslationX(viewPages[0].getMeasuredWidth() * progress);
+        }
+    }
+
+    protected void onItemSelected(View currentPage, View oldPage, int position, int oldPosition) {
+        if(itemSelectionListener!=null)
+            itemSelectionListener.onItemSelected(currentPage, oldPage, position, oldPosition);
+    }
+
+    public void setItemSelectionListener(ItemSelectionListener itemSelectionListener){
+        this.itemSelectionListener=itemSelectionListener;
+    }
+
+    public interface ItemSelectionListener{
+        void onItemSelected(View currentPage, View oldPage, int position, int oldPosition);
     }
 
     public abstract static class Adapter {
         public abstract int getItemCount();
-        public abstract View createView(int viewType);
-        public abstract void bindView(View view, int position, int viewType);
+		public abstract View createView(int viewType);
+		public abstract void bindView(View view, int position, int viewType);
 
-        public int getItemId(int position) {
+		public int getItemId(int position) {
             return position;
         }
 

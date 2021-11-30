@@ -56,6 +56,7 @@ public class MessageSeenView extends FrameLayout {
 
     ArrayList<Long> peerIds = new ArrayList<>();
     public ArrayList<TLRPC.User> users = new ArrayList<>();
+    public ArrayList<Long> seenUserIDs = new ArrayList<>();
     AvatarsImageView avatarsImageView;
     TextView titleView;
     ImageView iconView;
@@ -153,6 +154,7 @@ public class MessageSeenView extends FrameLayout {
                     HashMap<Long, TLRPC.User> usersLocal=new HashMap<>();
                     ArrayList<Long> allPeers=new ArrayList<>();
                     seenCount=vector.objects.size();
+                    seenUserIDs.addAll((ArrayList<Long>)(ArrayList)vector.objects); // yes, unchecked cast, yes, I know, no, I don't give a shit at this point
                     vector.objects.addAll(peerIds);
                     peerIds.clear();
                     for(int i=0, n=vector.objects.size(); i<n; i++){

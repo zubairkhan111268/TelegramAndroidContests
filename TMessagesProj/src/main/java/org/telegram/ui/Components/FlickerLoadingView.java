@@ -34,6 +34,7 @@ public class FlickerLoadingView extends View {
     public final static int MESSAGE_SEEN_TYPE = 13;
     public final static int CHAT_THEMES_TYPE = 14;
     public final static int MEMBER_REQUESTS_TYPE = 15;
+    public static final int REACTION_CELL_TYPE=16;
 
     private int gradientWidth;
     private LinearGradient gradient;
@@ -492,6 +493,23 @@ public class FlickerLoadingView extends View {
                     break;
                 }
             }
+        }else if(getViewType()==REACTION_CELL_TYPE){
+            int rectRadius = AndroidUtilities.dp(4);
+            canvas.drawCircle(checkRtl(AndroidUtilities.dp(27)), AndroidUtilities.dp(24), AndroidUtilities.dp(17), paint);
+            canvas.drawCircle(checkRtl(getWidth()-AndroidUtilities.dp(25)), AndroidUtilities.dp(24), AndroidUtilities.dp(11), paint);
+
+            if(itemsCount==0)
+                rectF.set(AndroidUtilities.dp(56), AndroidUtilities.dp(19), AndroidUtilities.dp(56+40), AndroidUtilities.dp(19+8));
+            else
+                rectF.set(AndroidUtilities.dp(56), AndroidUtilities.dp(19), AndroidUtilities.dp(56+44), AndroidUtilities.dp(19+8));
+            checkRtl(rectF);
+            canvas.drawRoundRect(rectF, rectRadius, rectRadius, paint);
+            if(itemsCount==0)
+                rectF.set(AndroidUtilities.dp(100), AndroidUtilities.dp(19), AndroidUtilities.dp(100+50), AndroidUtilities.dp(19+8));
+            else
+                rectF.set(AndroidUtilities.dp(104), AndroidUtilities.dp(19), AndroidUtilities.dp(104+60), AndroidUtilities.dp(19+8));
+            checkRtl(rectF);
+            canvas.drawRoundRect(rectF, rectRadius, rectRadius, paint);
         }
         invalidate();
     }
@@ -568,35 +586,26 @@ public class FlickerLoadingView extends View {
     }
 
     private int getCellHeight(int width) {
-        if (getViewType() == DIALOG_CELL_TYPE) {
-            return AndroidUtilities.dp((SharedConfig.useThreeLinesLayout ? 78 : 72) + 1);
-        } else if (getViewType() == DIALOG_TYPE) {
-            return AndroidUtilities.dp(78) + 1;
-        } else if (getViewType() == PHOTOS_TYPE) {
-            int photoWidth = (width - (AndroidUtilities.dp(2) * (getColumnsCount() - 1))) / getColumnsCount();
-            return photoWidth + AndroidUtilities.dp(2);
-        } else if (getViewType() == 3) {
-            return AndroidUtilities.dp(56);
-        } else if (getViewType() == 4) {
-            return AndroidUtilities.dp(56);
-        } else if (getViewType() == 5) {
-            return AndroidUtilities.dp(80);
-        } else if (getViewType() == USERS_TYPE) {
-            return AndroidUtilities.dp(64);
-        } else if (getViewType() == INVITE_LINKS_TYPE) {
-            return AndroidUtilities.dp(66);
-        } else if (getViewType() == USERS2_TYPE) {
-            return AndroidUtilities.dp(58);
-        } else if (getViewType() == CALL_LOG_TYPE) {
-            return AndroidUtilities.dp(61);
-        } else if (getViewType() == BOTS_MENU_TYPE) {
-            return AndroidUtilities.dp(36);
-        } else if (getViewType() == SHARE_ALERT_TYPE) {
-            return AndroidUtilities.dp(103);
-        } else if (getViewType() == MEMBER_REQUESTS_TYPE) {
-            return AndroidUtilities.dp(107);
-        }
-        return 0;
+        return switch(getViewType()){
+            case DIALOG_CELL_TYPE -> AndroidUtilities.dp((SharedConfig.useThreeLinesLayout ? 78 : 72)+1);
+            case DIALOG_TYPE -> AndroidUtilities.dp(78)+1;
+            case PHOTOS_TYPE -> {
+                int photoWidth=(width-(AndroidUtilities.dp(2)*(getColumnsCount()-1)))/getColumnsCount();
+                yield photoWidth+AndroidUtilities.dp(2);
+            }
+            case 3 -> AndroidUtilities.dp(56);
+            case 4 -> AndroidUtilities.dp(56);
+            case 5 -> AndroidUtilities.dp(80);
+            case USERS_TYPE -> AndroidUtilities.dp(64);
+            case INVITE_LINKS_TYPE -> AndroidUtilities.dp(66);
+            case USERS2_TYPE -> AndroidUtilities.dp(58);
+            case CALL_LOG_TYPE -> AndroidUtilities.dp(61);
+            case BOTS_MENU_TYPE -> AndroidUtilities.dp(36);
+            case SHARE_ALERT_TYPE -> AndroidUtilities.dp(103);
+            case MEMBER_REQUESTS_TYPE -> AndroidUtilities.dp(107);
+            case REACTION_CELL_TYPE -> AndroidUtilities.dp(48);
+            default -> 0;
+        };
     }
 
     public void showDate(boolean showDate) {

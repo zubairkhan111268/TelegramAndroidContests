@@ -2168,7 +2168,7 @@ public class RecyclerListView extends RecyclerView {
         lastY = Float.MAX_VALUE;
         multiSelectionGesture = false;
         multiSelectionGestureStarted = false;
-        getParent().requestDisallowInterceptTouchEvent(false);
+//        getParent().requestDisallowInterceptTouchEvent(false);
         cancelMultiselectScroll();
         return super.onTouchEvent(e);
     }

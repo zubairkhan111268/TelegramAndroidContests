@@ -5454,7 +5454,6 @@ public class MessagesController extends BaseController implements NotificationCe
                         TLRPC.TL_messages_getMessagesReactions req=null;
                         for (int b = 0, N2 = array.size(); b < N2; b++) {
                             MessageObject messageObject = array.valueAt(b);
-                            TLRPC.TL_messageMediaPoll mediaPoll = (TLRPC.TL_messageMediaPoll) messageObject.messageOwner.media;
                             int timeout = 30000;
                             if (Math.abs(time - messageObject.reactionLastCheckTime) < timeout) {
                                 if (!messageObject.reactionVisibleOnScreen) {

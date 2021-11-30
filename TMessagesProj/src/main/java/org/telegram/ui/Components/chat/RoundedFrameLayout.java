@@ -13,7 +13,7 @@ import org.telegram.messenger.AndroidUtilities;
 
 import androidx.annotation.NonNull;
 
-public class RoundedFrameLayout extends FrameLayout{
+public class RoundedFrameLayout extends LayoutIgnoringFrameLayout{
 
 	private Paint clearPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
 	private Path path=new Path();
@@ -31,7 +31,8 @@ public class RoundedFrameLayout extends FrameLayout{
 		rectF.set(0, 0, w, h);
 		path.rewind();
 		path.addRoundRect(rectF, AndroidUtilities.dp(6), AndroidUtilities.dp(6), Path.Direction.CW);
-		path.toggleInverseFillType();
+		if(!path.isInverseFillType())
+			path.toggleInverseFillType();
 	}
 
 	@Override
