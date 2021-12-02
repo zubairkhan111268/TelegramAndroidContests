@@ -9,6 +9,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RoundRectShape;
 import android.os.Build;
@@ -129,6 +130,12 @@ public class MessageCellReactionButton extends FrameLayout{
 			setBackground(serviceBg);
 			setForeground(null);
 		}
+	}
+
+	public void setDrawableAndCount(Drawable drawable, int count){
+		icon.setVisibility(VISIBLE);
+		icon.setImageDrawable(new LayerDrawable(new Drawable[]{drawable})); // ImageReceiver will ignore the color filter otherwise
+		counter.setNumber(count, false);
 	}
 
 	public void setReactions(TLRPC.TL_reactionCount reaction, List<TLRPC.User> avaUsers, boolean animated){

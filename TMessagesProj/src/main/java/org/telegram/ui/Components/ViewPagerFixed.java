@@ -54,8 +54,8 @@ import java.util.ArrayList;
 
 public class ViewPagerFixed extends FrameLayout {
 
-    int currentPosition;
-    int nextPosition;
+    protected int currentPosition;
+    protected int nextPosition;
     protected View[] viewPages;
     private int[] viewTypes;
 
