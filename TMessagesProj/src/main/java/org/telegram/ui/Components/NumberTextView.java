@@ -40,6 +40,8 @@ public class NumberTextView extends View {
     private float textWidth;
     private float oldTextWidth;
 
+    private boolean wrapContent;
+
     public NumberTextView(Context context) {
         super(context);
     }
@@ -60,6 +62,18 @@ public class NumberTextView extends View {
 
     public void setAddNumber() {
         addNumber = true;
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec){
+        if(wrapContent)
+            setMeasuredDimension(Math.round(textWidth), Math.round(textPaint.descent()-textPaint.ascent()));
+        else
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    public void setWrapContent(boolean wrapContent){
+        this.wrapContent=wrapContent;
     }
 
     public void setNumber(int number, boolean animated) {
@@ -86,12 +100,12 @@ public class NumberTextView extends View {
             forwardAnimation = number > currentNumber;
         }
         boolean replace = false;
-        if (center) {
-            textWidth = textPaint.measureText(text);
-            oldTextWidth = textPaint.measureText(oldText);
-            if (textWidth != oldTextWidth) {
+        textWidth = textPaint.measureText(text);
+        oldTextWidth = textPaint.measureText(oldText);
+        if (textWidth != oldTextWidth) {
+        	requestLayout();
+            if(center)
                 replace = true;
-            }
         }
 
         currentNumber = number;

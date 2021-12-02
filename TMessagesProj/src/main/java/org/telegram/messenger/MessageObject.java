@@ -422,6 +422,7 @@ public class MessageObject {
         public long groupId;
         public boolean hasSibling;
         public boolean hasCaption;
+        public boolean hasReactions;
         public ArrayList<MessageObject> messages = new ArrayList<>();
         public ArrayList<GroupedMessagePosition> posArray = new ArrayList<>();
         public HashMap<MessageObject, GroupedMessagePosition> positions = new HashMap<>();
@@ -483,6 +484,7 @@ public class MessageObject {
             hasSibling = false;
 
             hasCaption = false;
+            hasReactions=false;
 
             for (int a = 0; a < count; a++) {
                 MessageObject messageObject = messages.get(a);
@@ -495,6 +497,9 @@ public class MessageObject {
                     );
                     if (messageObject.isMusic() || messageObject.isDocument()) {
                         isDocuments = true;
+                    }
+                    if(messageObject.hasReactions()){
+                        hasReactions=true;
                     }
                 }
                 TLRPC.PhotoSize photoSize = FileLoader.getClosestPhotoSizeWithSize(messageObject.photoThumbs, AndroidUtilities.getPhotoSize());

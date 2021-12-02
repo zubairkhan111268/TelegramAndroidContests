@@ -1150,7 +1150,7 @@ public class ChatMessagePopupMenu{
 							if(Objects.equals(adapterType, type)){
 								list.getAdapter().notifyItemRangeChanged(prevCount, addedCount);
 								if(removedCount>0)
-									list.getAdapter().notifyItemRangeRemoved(list.getAdapter().getItemCount()-1-removedCount, removedCount);
+									list.getAdapter().notifyItemRangeRemoved(list.getAdapter().getItemCount()-removedCount, removedCount);
 							}else if(affectedTypes!=null && adapterType!=null && affectedTypes.contains(adapterType)){
 								list.getAdapter().notifyDataSetChanged();
 							}

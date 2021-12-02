@@ -54,6 +54,14 @@ public class AvatarsImageView extends FrameLayout {
     private boolean isInCall;
     protected int count;
 
+    private boolean layoutOverridden;
+    private int size, stagger, borderWidth;
+
+    public void forceCommitTransition(boolean animated){
+        wasDraw=true;
+        commitTransition(animated);
+    }
+
     public void commitTransition(boolean animated) {
         if (!wasDraw || !animated) {
             transitionProgress = 1f;
@@ -156,6 +164,15 @@ public class AvatarsImageView extends FrameLayout {
         invalidate();
     }
 
+    // sorry but I'm not having any of this hardcoded shit
+    public void setLayout(int size, int stagger, int borderWidth){
+        layoutOverridden=true;
+        this.size=AndroidUtilities.dp(size);
+        this.stagger=AndroidUtilities.dp(stagger);
+        this.borderWidth=AndroidUtilities.dp(borderWidth);
+        currentStyle=0;
+    }
+
     private static class DrawingState {
 
         public static final int ANIMATION_TYPE_NONE = -1;
@@ -249,10 +266,15 @@ public class AvatarsImageView extends FrameLayout {
         } else {
             animatingStates[index].imageReceiver.setForUserOrChat(currentChat, animatingStates[index].avatarDrawable);
         }
-        boolean bigAvatars = currentStyle == 4 || currentStyle == STYLE_GROUP_CALL_TOOLTIP;
-        animatingStates[index].imageReceiver.setRoundRadius(AndroidUtilities.dp(bigAvatars ? 16 : 12));
-        int size = AndroidUtilities.dp(bigAvatars ? 32 : 24);
-        animatingStates[index].imageReceiver.setImageCoords(0, 0, size, size);
+        if(layoutOverridden){
+            animatingStates[index].imageReceiver.setRoundRadius(size/2);
+            animatingStates[index].imageReceiver.setImageCoords(0, 0, size, size);
+        }else{
+            boolean bigAvatars=currentStyle==4 || currentStyle==STYLE_GROUP_CALL_TOOLTIP;
+            animatingStates[index].imageReceiver.setRoundRadius(AndroidUtilities.dp(bigAvatars ? 16 : 12));
+            int size=AndroidUtilities.dp(bigAvatars ? 32 : 24);
+            animatingStates[index].imageReceiver.setImageCoords(0, 0, size, size);
+        }
         invalidate();
     }
 
@@ -262,9 +284,11 @@ public class AvatarsImageView extends FrameLayout {
         wasDraw = true;
 
         boolean bigAvatars = currentStyle == 4 || currentStyle == STYLE_GROUP_CALL_TOOLTIP;
-        int size = AndroidUtilities.dp(bigAvatars ? 32 : 24);
+        int size = layoutOverridden ? this.size : AndroidUtilities.dp(bigAvatars ? 32 : 24);
         int toAdd;
-        if (currentStyle == STYLE_MESSAGE_SEEN) {
+        if(layoutOverridden){
+            toAdd=stagger;
+        }else if (currentStyle == STYLE_MESSAGE_SEEN) {
             toAdd = AndroidUtilities.dp(12);
         } else {
             toAdd = AndroidUtilities.dp(bigAvatars ? 24 : 20);
@@ -414,14 +438,15 @@ public class AvatarsImageView extends FrameLayout {
                         states[a].wavesDrawable.draw(canvas, imageReceiver.getCenterX(), imageReceiver.getCenterY(), this);
                         avatarScale = states[a].wavesDrawable.getAvatarScale();
                     } else {
+                        int circleRadius=layoutOverridden ? (size/2+borderWidth) : AndroidUtilities.dp(bigAvatars ? 17 : 13);
                         if (useAlphaLayer) {
-                            canvas.drawCircle(imageReceiver.getCenterX(), imageReceiver.getCenterY(), AndroidUtilities.dp(bigAvatars ? 17 : 13), xRefP);
+                            canvas.drawCircle(imageReceiver.getCenterX(), imageReceiver.getCenterY(), circleRadius, xRefP);
                         } else {
                             int paintAlpha = paint.getAlpha();
                             if (alpha != 1f) {
                                 paint.setAlpha((int) (paintAlpha * alpha));
                             }
-                            canvas.drawCircle(imageReceiver.getCenterX(), imageReceiver.getCenterY(), AndroidUtilities.dp(bigAvatars ? 17 : 13), paint);
+                            canvas.drawCircle(imageReceiver.getCenterX(), imageReceiver.getCenterY(), circleRadius, paint);
                             if (alpha != 1f) {
                                 paint.setAlpha(paintAlpha);
                             }
