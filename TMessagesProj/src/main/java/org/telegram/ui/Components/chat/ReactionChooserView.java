@@ -87,13 +87,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 	@Override
 	public void onAnimationReady(ImageReceiver imageReceiver){
 		RLottieDrawable drawable=imageReceiver.getLottieAnimation();
-		drawable.stop();
-		drawable.setCurrentFrame(0);
-		drawable.setAutoRepeat(1);
-		drawable.setOnFinishCallback(()->{
-			drawable.stop();
-			drawable.setCurrentFrame(0);
-		}, drawable.getFramesCount()-2);
+		drawable.setAutoRepeat(3);
 	}
 
 	@Override
@@ -114,7 +108,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 			if(drawable==null || drawable.isRunning())
 				continue;
 			if(rand.nextInt(4)==2)
-				drawable.start();
+				drawable.restart();
 		}
 		postDelayed(this::maybeRestartDrawables, 500);
 	}

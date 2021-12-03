@@ -454,7 +454,7 @@ public class ChatMessagePopupMenu{
 		menuView.addView(clippingView);
 
 		TLRPC.ChatFull chatFull=fragment.getCurrentChatInfo();
-		if((fragment.getCurrentUser()!=null && fragment.getCurrentEncryptedChat()==null) || (chatFull!=null && chatFull.available_reactions!=null && !chatFull.available_reactions.isEmpty())){
+		if(((fragment.getCurrentUser()!=null && fragment.getCurrentEncryptedChat()==null) || (chatFull!=null && chatFull.available_reactions!=null && !chatFull.available_reactions.isEmpty())) && selectedObject.messageOwner.action==null){
 			List<TLRPC.TL_availableReaction> availableReactions;
 			if(fragment.getCurrentUser()!=null)
 				availableReactions=fragment.getMediaDataController().getAvailableReactions();
@@ -660,7 +660,8 @@ public class ChatMessagePopupMenu{
 					@Override
 					public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity){
 						showAnim=null;
-						reactionChooserView.setIgnoreLayout(false);
+						if(reactionChooserView!=null)
+							reactionChooserView.setIgnoreLayout(false);
 					}
 				});
 				showAnim=anim;
