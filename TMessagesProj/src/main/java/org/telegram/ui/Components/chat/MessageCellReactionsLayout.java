@@ -150,6 +150,18 @@ public class MessageCellReactionsLayout extends ViewGroup{
 		this.message=message;
 		this.inBubble=inBubble;
 		hasUnknownUsers=false;
+		boolean showAvatars=true;
+		if(message.messageOwner.reactions.recent_reactons!=null && !message.messageOwner.reactions.recent_reactons.isEmpty()){
+			String avatarsReaction=message.messageOwner.reactions.recent_reactons.get(0).reaction;
+			for(TLRPC.TL_messageUserReaction reaction:message.messageOwner.reactions.recent_reactons){
+				if(!avatarsReaction.equals(reaction.reaction)){
+					showAvatars=false;
+					break;
+				}
+			}
+		}else{
+			showAvatars=false;
+		}
 
 		if(sameMessage){
 			if(getLayoutTransition()==null)
@@ -159,11 +171,12 @@ public class MessageCellReactionsLayout extends ViewGroup{
 				MessageCellReactionButton btn=(MessageCellReactionButton) getChildAt(i);
 				existingButtons.put(btn.getReaction().reaction, btn);
 			}
+			boolean finalShowAvatars=showAvatars;
 			List<TLRPC.TL_reactionCount> addedReactions=message.messageOwner.reactions.results.stream().filter(r->{
 				MessageCellReactionButton btn=existingButtons.remove(r.reaction);
 				if(btn==null)
 					return true;
-				btn.setReactions(r, makeUserListForReaction(r, message.messageOwner.reactions.recent_reactons), true);
+				btn.setReactions(r, finalShowAvatars ? makeUserListForReaction(r, message.messageOwner.reactions.recent_reactons) : null, true);
 				btn.setSelected(r.chosen, true);
 				return false;
 			}).collect(Collectors.toList());
@@ -176,7 +189,7 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			if(!addedReactions.isEmpty()){
 				for(TLRPC.TL_reactionCount count : addedReactions){
 					MessageCellReactionButton button=obtainButton();
-					button.setReactions(count, makeUserListForReaction(count, message.messageOwner.reactions.recent_reactons), false);
+					button.setReactions(count, showAvatars ? makeUserListForReaction(count, message.messageOwner.reactions.recent_reactons) : null, false);
 					button.setSelected(count.chosen, false);
 				}
 			}
@@ -189,7 +202,7 @@ public class MessageCellReactionsLayout extends ViewGroup{
 				return;
 			for(TLRPC.TL_reactionCount count : message.messageOwner.reactions.results){
 				MessageCellReactionButton button=obtainButton();
-				button.setReactions(count, makeUserListForReaction(count, message.messageOwner.reactions.recent_reactons), false);
+				button.setReactions(count, showAvatars ? makeUserListForReaction(count, message.messageOwner.reactions.recent_reactons) : null, false);
 				button.setSelected(count.chosen, false);
 			}
 		}

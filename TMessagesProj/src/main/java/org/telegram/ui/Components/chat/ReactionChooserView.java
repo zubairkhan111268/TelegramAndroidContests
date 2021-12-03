@@ -88,6 +88,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 	public void onAnimationReady(ImageReceiver imageReceiver){
 		RLottieDrawable drawable=imageReceiver.getLottieAnimation();
 		drawable.setAutoRepeat(3);
+		drawable.setCurrentFrame(0, true);
 	}
 
 	@Override

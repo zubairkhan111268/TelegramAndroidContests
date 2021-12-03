@@ -454,7 +454,8 @@ public class ChatMessagePopupMenu{
 		menuView.addView(clippingView);
 
 		TLRPC.ChatFull chatFull=fragment.getCurrentChatInfo();
-		if(((fragment.getCurrentUser()!=null && fragment.getCurrentEncryptedChat()==null) || (chatFull!=null && chatFull.available_reactions!=null && !chatFull.available_reactions.isEmpty())) && selectedObject.messageOwner.action==null){
+		if(((fragment.getCurrentUser()!=null && fragment.getCurrentEncryptedChat()==null) || (chatFull!=null && chatFull.available_reactions!=null && !chatFull.available_reactions.isEmpty())) &&
+				selectedObject.messageOwner.action==null && !selectedObject.scheduled && !selectedObject.isSponsored()){
 			List<TLRPC.TL_availableReaction> availableReactions;
 			if(fragment.getCurrentUser()!=null)
 				availableReactions=fragment.getMediaDataController().getAvailableReactions();
