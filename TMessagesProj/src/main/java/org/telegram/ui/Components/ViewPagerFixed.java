@@ -569,6 +569,10 @@ public class ViewPagerFixed extends FrameLayout {
 
     }
 
+    protected void doneAnimating(){
+
+    }
+
 	private void onPageScrolled(float progress){
         onScrolled(progress);
         if (progress == 1f) {

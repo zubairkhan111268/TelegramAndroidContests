@@ -114,6 +114,7 @@ public class ChatMessagePopupMenu{
 	private LayoutIgnoringFrameLayout clippingView;
 	private FrameLayout menuView;
 	private ScrollView menuScroller;
+	private LinearLayout menuContent;
 	private LinearLayout seenContent;
 	private View scrim, whiteBg;
 	private ViewPagerFixed reactionsPager;
@@ -128,6 +129,7 @@ public class ChatMessagePopupMenu{
 	private LinearLayout tabBar;
 	private int currentTab;
 	private boolean scrollingPagerFromTab;
+	private ReactionChooserView reactionChooserView;
 
 	private int maxListHeight;
 
@@ -430,7 +432,7 @@ public class ChatMessagePopupMenu{
 		menuWrapper.setOrientation(LinearLayout.VERTICAL);
 		menuView=new FrameLayout(getParentActivity());
 		menuScroller=new ScrollView(getParentActivity());
-		LinearLayout menuContent=new LinearLayout(getParentActivity());
+		menuContent=new LinearLayout(getParentActivity());
 		menuContent.setOrientation(LinearLayout.VERTICAL);
 
 		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.LOLLIPOP){
@@ -446,10 +448,25 @@ public class ChatMessagePopupMenu{
 			clippingView.setClipToOutline(true);
 		}
 		menuScroller.addView(menuContent);
-		menuScroller.setPivotX(0);
-		menuScroller.setPivotY(0);
+		menuContent.setPivotX(0);
+		menuContent.setPivotY(0);
 		clippingView.addView(menuScroller, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 		menuView.addView(clippingView);
+
+		TLRPC.ChatFull chatFull=fragment.getCurrentChatInfo();
+		if((fragment.getCurrentUser()!=null && fragment.getCurrentEncryptedChat()==null) || (chatFull!=null && chatFull.available_reactions!=null && !chatFull.available_reactions.isEmpty())){
+			List<TLRPC.TL_availableReaction> availableReactions;
+			if(fragment.getCurrentUser()!=null)
+				availableReactions=fragment.getMediaDataController().getAvailableReactions();
+			else
+				availableReactions=chatFull.available_reactions.stream().map(fragment.getMediaDataController()::getReaction).collect(Collectors.toList());
+			reactionChooserView=new ReactionChooserView(getParentActivity(), themeDelegate, availableReactions);
+			FrameLayout reactionsWrapper=new FrameLayout(getParentActivity());
+
+			menuWrapper.addView(reactionsWrapper, LayoutHelper.createLinear(276, 71, 0, 0, 0, -17));
+			reactionsWrapper.addView(reactionChooserView, LayoutHelper.createFrame(Math.min(276, Math.max(110, 10+9+39*availableReactions.size())), 71, Gravity.RIGHT));
+		}
+
 		menuWrapper.addView(menuView, LayoutHelper.createLinear(220+10, LayoutHelper.WRAP_CONTENT));
 		windowView.addView(menuWrapper, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT));
 
@@ -615,7 +632,12 @@ public class ChatMessagePopupMenu{
 			@Override
 			public boolean onPreDraw(){
 				menuWrapper.getViewTreeObserver().removeOnPreDrawListener(this);
-
+				int reactionChooserTargetLeft=reactionChooserView!=null ? reactionChooserView.getLeft() : 0;
+				int reactionChooserStartLeft=reactionChooserView!=null ? (reactionChooserView.getRight()-AndroidUtilities.dp(54)) : 0;
+				if(reactionChooserView!=null){
+					reactionChooserView.setLeft(reactionChooserStartLeft);
+					reactionChooserView.setIgnoreLayout(true);
+				}
 				SpringAnimation anim=new SpringAnimation(menuWrapper, new FloatPropertyCompat<Object>(""){
 					@Override
 					public float getValue(Object object){
@@ -627,6 +649,9 @@ public class ChatMessagePopupMenu{
 						menuWrapper.setScaleX(value/2f+.5f);
 						menuWrapper.setScaleY(value/2f+.5f);
 						menuWrapper.setAlpha(Math.min(1f, value));
+						if(reactionChooserView!=null){
+							reactionChooserView.setLeft(Math.round(reactionChooserTargetLeft+(reactionChooserStartLeft-reactionChooserTargetLeft)*(1f-value)));
+						}
 					}
 				}, 1f);
 				anim.setSpring(new SpringForce().setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY).setStiffness(500f).setFinalPosition(1f));
@@ -635,6 +660,7 @@ public class ChatMessagePopupMenu{
 					@Override
 					public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity){
 						showAnim=null;
+						reactionChooserView.setIgnoreLayout(false);
 					}
 				});
 				showAnim=anim;
@@ -899,13 +925,15 @@ public class ChatMessagePopupMenu{
 		scrim.setAlpha(1f);
 		seenContent.setTranslationX(0f);
 		whiteBg.setTranslationX(0f);
-		menuScroller.setTranslationX(AndroidUtilities.dp(-50));
-		menuScroller.setScaleX(.9f);
-		menuScroller.setScaleY(.9f);
+		menuContent.setTranslationX(AndroidUtilities.dp(-50));
+		menuContent.setScaleX(.9f);
+		menuContent.setScaleY(.9f);
 		// menuView.bottom & clippingView.bottom will get reset during the next layout pass
 		scrim.setVisibility(View.GONE);
 		whiteBg.setVisibility(View.GONE);
 		menuScroller.setVisibility(View.GONE);
+		if(reactionChooserView!=null)
+			reactionChooserView.setVisibility(View.INVISIBLE);
 	}
 
 	private void animateSeenViewOpening(long duration, boolean reopening){
@@ -920,17 +948,21 @@ public class ChatMessagePopupMenu{
 		clippingView.setIgnoreLayout(true);
 
 		AnimatorSet set=new AnimatorSet();
-		set.playTogether(
-				ObjectAnimator.ofFloat(scrim, View.ALPHA, 1f),
-				ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, 0f),
-				ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, 0f),
-				ObjectAnimator.ofFloat(menuScroller, View.TRANSLATION_X, AndroidUtilities.dp(-50)),
-				ObjectAnimator.ofFloat(menuScroller, View.SCALE_X, .9f),
-				ObjectAnimator.ofFloat(menuScroller, View.SCALE_Y, .9f),
-				ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom+heightDiff),
-				ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom+heightDiff)
-		);
-		set.setDuration(duration);
+		ArrayList<Animator> anims=new ArrayList<>();
+		anims.add(ObjectAnimator.ofFloat(scrim, View.ALPHA, 1f));
+		anims.add(ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, 0f));
+		anims.add(ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, 0f));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.TRANSLATION_X, AndroidUtilities.dp(-50)));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.SCALE_X, .9f));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.SCALE_Y, .9f));
+		anims.add(ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom+heightDiff));
+		anims.add(ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom+heightDiff));
+		for(Animator a:anims)
+			a.setDuration(duration);
+		if(reactionChooserView!=null)
+			anims.add(ObjectAnimator.ofFloat(reactionChooserView, View.ALPHA, 0f).setDuration(150));
+		set.playTogether(anims);
+//		set.setDuration(duration);
 		set.setInterpolator(new CubicBezierInterpolator(.09, .13, 0, 1));
 		set.addListener(new AnimatorListenerAdapter(){
 			@Override
@@ -951,17 +983,28 @@ public class ChatMessagePopupMenu{
 			return;
 		animatingSeenView=true;
 		clippingView.setIgnoreLayout(true);
+		if(reactionChooserView!=null)
+			reactionChooserView.setVisibility(View.VISIBLE);
 		AnimatorSet set=new AnimatorSet();
-		set.playTogether(
-				ObjectAnimator.ofFloat(scrim, View.ALPHA, 0f),
-				ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, seenContent.getWidth()),
-				ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, seenContent.getWidth()),
-				ObjectAnimator.ofFloat(menuScroller, View.TRANSLATION_X, 0f),
-				ObjectAnimator.ofFloat(menuScroller, View.SCALE_X, 1f),
-				ObjectAnimator.ofFloat(menuScroller, View.SCALE_Y, 1f),
-				ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom),
-				ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom)
-		);
+		ArrayList<Animator> anims=new ArrayList<>();
+		anims.add(ObjectAnimator.ofFloat(scrim, View.ALPHA, 0f));
+		anims.add(ObjectAnimator.ofFloat(seenContent, View.TRANSLATION_X, seenContent.getWidth()));
+		anims.add(ObjectAnimator.ofFloat(whiteBg, View.TRANSLATION_X, seenContent.getWidth()));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.TRANSLATION_X, 0f));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.SCALE_X, 1f));
+		anims.add(ObjectAnimator.ofFloat(menuContent, View.SCALE_Y, 1f));
+		anims.add(ObjectAnimator.ofInt(menuView, "bottom", initialMenuViewBottom));
+		anims.add(ObjectAnimator.ofInt(clippingView, "bottom", initialClippingViewBottom));
+		if(reactionChooserView!=null){
+			int reactionChooserTargetLeft=reactionChooserView.getLeft();
+			int reactionChooserStartLeft=reactionChooserView.getRight()-AndroidUtilities.dp(54);
+			anims.add(ObjectAnimator.ofInt(reactionChooserView, "left", reactionChooserStartLeft, reactionChooserTargetLeft));
+			anims.add(ObjectAnimator.ofFloat(reactionChooserView, View.ALPHA, 1f));
+			anims.add(ObjectAnimator.ofFloat(reactionChooserView, "pivotX", AndroidUtilities.dp(27), reactionChooserView.getWidth()-AndroidUtilities.dp(27)));
+			anims.add(ObjectAnimator.ofFloat(reactionChooserView, View.SCALE_X, .5f, 1f));
+			anims.add(ObjectAnimator.ofFloat(reactionChooserView, View.SCALE_Y, .5f, 1f));
+		}
+		set.playTogether(anims);
 		set.setDuration(duration);
 		set.setInterpolator(new CubicBezierInterpolator(.09, .13, 0, 1));
 		set.addListener(new AnimatorListenerAdapter(){
@@ -1089,6 +1132,14 @@ public class ChatMessagePopupMenu{
 		scrollingPagerFromTab=true;
 		reactionsPager.setPositionAnimated(i);
 		setSelectedTab(i);
+//		reactionsPager.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
+//			@Override
+//			public boolean onPreDraw(){
+//				reactionsPager.getViewTreeObserver().removeOnPreDrawListener(this);
+//				clippingView.setIgnoreLayout(true);
+//				return true;
+//			}
+//		});
 	}
 
 	private void setSelectedTab(int tab){
@@ -1325,10 +1376,10 @@ public class ChatMessagePopupMenu{
 							scrim.setAlpha(1f-progress);
 							seenContent.setTranslationX(progress*seenContent.getWidth());
 							whiteBg.setTranslationX(progress*seenContent.getWidth());
-							menuScroller.setTranslationX(AndroidUtilities.dp(-50)*(1f-progress));
+							menuContent.setTranslationX(AndroidUtilities.dp(-50)*(1f-progress));
 							float scale=.9f+(.1f*progress);
-							menuScroller.setScaleX(scale);
-							menuScroller.setScaleY(scale);
+							menuContent.setScaleX(scale);
+							menuContent.setScaleY(scale);
 							int heightDiff=seenContent.getHeight()-menuScroller.getHeight();
 							menuView.setBottom(initialMenuViewBottom+Math.round(heightDiff*(1f-progress)));
 							clippingView.setBottom(initialClippingViewBottom+Math.round(heightDiff*(1f-progress)));
@@ -1366,14 +1417,17 @@ public class ChatMessagePopupMenu{
 				}
 			}
 			if(!scrollingPagerFromTab){
-				if(progress>0.6f && progress<1f && currentTab!=nextPosition){
+				if(progress>0.6f && currentTab!=nextPosition){
 					setSelectedTab(nextPosition);
 				}else if(progress<0.4f && currentTab!=currentPosition){
 					setSelectedTab(currentPosition);
 				}
-			}else if(progress==1f){
-				scrollingPagerFromTab=false;
 			}
+		}
+
+		@Override
+		protected void doneAnimating(){
+			scrollingPagerFromTab=false;
 		}
 	}
 

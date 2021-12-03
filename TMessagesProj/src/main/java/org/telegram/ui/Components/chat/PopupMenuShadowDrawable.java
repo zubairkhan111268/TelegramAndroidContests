@@ -74,7 +74,8 @@ import androidx.annotation.Nullable;
 		dst.set(bounds.right-patchSize, bounds.top+patchSize, bounds.right, bounds.bottom-patchSize);
 		canvas.drawBitmap(shadowBitmap, src, dst, paint);
 
-		paint.setColor(theme.getColor(Theme.key_actionBarDefaultSubmenuBackground));
+		Integer color=theme.getColor(Theme.key_actionBarDefaultSubmenuBackground);
+		paint.setColor(color!=null ? color : Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground));
 		rectF.set(bounds.left+shadowOffset, bounds.top+shadowOffset, bounds.right-shadowOffset, bounds.bottom-shadowOffset);
 		canvas.drawRoundRect(rectF, AndroidUtilities.dp(6), AndroidUtilities.dp(6), paint);
 	}
