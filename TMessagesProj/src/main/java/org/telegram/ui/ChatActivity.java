@@ -238,6 +238,7 @@ import org.telegram.ui.Components.ViewHelper;
 import org.telegram.ui.Components.chat.ChatMessagePopupMenu;
 import org.telegram.ui.Components.chat.MessageCellReactionButton;
 import org.telegram.ui.Components.chat.ReactionAnimationOverlay;
+import org.telegram.ui.Components.chat.SingleReactionPopupMenu;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.Delegates.ChatActivityMemberRequestsDelegate;
 
@@ -735,6 +736,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private ThemeDelegate themeDelegate;
     private ChatActivityMemberRequestsDelegate pendingRequestsDelegate;
     private ReactionAnimationOverlay currentReactionAnimOverlay;
+    private SingleReactionPopupMenu currentReactionPopup;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -18887,15 +18889,26 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             currentMessageMenu.setPauseNotifications(false);
             currentMessageMenu.dismiss();
         }
-    }
+		if(currentReactionPopup!=null){
+			currentReactionPopup.dismiss();
+			currentReactionPopup=null;
+		}
+		if(currentReactionAnimOverlay!=null){
+			currentReactionAnimOverlay.dismiss();
+		}
+	}
 
-    @Override
+	@Override
     public void onPause() {
         super.onPause();
         if (currentMessageMenu != null) {
             currentMessageMenu.setPauseNotifications(false);
             currentMessageMenu.dismiss();
         }
+        if(currentReactionPopup!=null){
+        	currentReactionPopup.dismiss();
+        	currentReactionPopup=null;
+		}
 		if(currentReactionAnimOverlay!=null){
 			currentReactionAnimOverlay.dismiss();
 		}
@@ -19269,8 +19282,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             currentMessageMenu.dismiss();
             scrimView = null;
         }
-        if(currentReactionAnimOverlay!=null){
-        	currentReactionAnimOverlay.dismiss();
+		if(currentReactionPopup!=null){
+			currentReactionPopup.dismiss();
+			currentReactionPopup=null;
+		}
+		if(currentReactionAnimOverlay!=null){
+			currentReactionAnimOverlay.dismiss();
 		}
 
         if (!AndroidUtilities.isTablet()) {
@@ -20548,7 +20565,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         } else if (messagesSearchListView.getTag() != null) {
             showMessagesSearchListView(false);
             return false;
-        } else if (currentMessageMenu != null) {
+        }else if(currentReactionPopup!=null){
+        	currentReactionPopup.dismiss();
+        	return false;
+		} else if (currentMessageMenu != null) {
             currentMessageMenu.dismiss();
             return false;
         } else if (checkRecordLocked(false)) {
@@ -22156,7 +22176,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 					@Override
 					public boolean didLongPressReaction(ChatMessageCell cell, TLRPC.TL_reactionCount reaction, MessageCellReactionButton button){
                     	if(currentChat!=null && (!ChatObject.isChannelAndNotMegaGroup(currentChat) || !ChatObject.isChannel(currentChat)) && !(chatInfo.linked_chat_id!=0 && cell.getMessageObject().messageOwner.from_id.channel_id==chatInfo.linked_chat_id)){
-                    		// TODO
+							currentReactionPopup=new SingleReactionPopupMenu(ChatActivity.this, cell.getMessageObject(), button);
+							currentReactionPopup.setOnDismissAction(()->currentReactionPopup=null);
+							currentReactionPopup.show();
 							return true;
 						}
 						return false;

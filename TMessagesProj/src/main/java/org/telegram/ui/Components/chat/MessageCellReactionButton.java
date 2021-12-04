@@ -53,6 +53,8 @@ public class MessageCellReactionButton extends FrameLayout{
 	private AvatarsImageView avatarsView;
 	private Animator currentTransitionAnim;
 	private HashSet<Long> currentAvaUserIDs=new HashSet<>();
+	private List<TLRPC.User> currentAvaUsers;
+	private boolean isInsideBubble;
 
 	private static final Property<MessageCellReactionButton, Float> SELECTEDNESS_PROPERTY;
 
@@ -115,6 +117,7 @@ public class MessageCellReactionButton extends FrameLayout{
 	}
 
 	public void setBackgroundType(boolean insideBubble, boolean isOut){
+		isInsideBubble=insideBubble;
 		if(insideBubble){
 			int color=getColor(isOut ? Theme.key_chat_outPreviewInstantText : Theme.key_chat_inPreviewInstantText);
 			if(inBubbleBg==null){
@@ -145,6 +148,24 @@ public class MessageCellReactionButton extends FrameLayout{
 		counter.setNumber(count, false);
 	}
 
+	public void copyFrom(MessageCellReactionButton other){
+		setReactions(other.reactions, other.currentAvaUsers, false);
+		setBackground(other.getBackground());
+		setForeground(other.getForeground());
+		selected=other.selected;
+		selectedness=selected ? 1f : 0f;
+		setForegroundColor(other.paint.getColor());
+	}
+
+	public void setBackgroundColor(String key){
+		int color=getColor(key);
+		inBubbleBg.getPaint().setColor(color);
+	}
+
+	public boolean isInsideBubble(){
+		return isInsideBubble;
+	}
+
 	public void setReactions(TLRPC.TL_reactionCount reaction, List<TLRPC.User> avaUsers, boolean animated){
 		boolean countChanged=reactions!=null && reactions.count!=reaction.count;
 		boolean avatarsChanged=false;
@@ -173,6 +194,7 @@ public class MessageCellReactionButton extends FrameLayout{
 		}
 
 		reactions=reaction;
+		currentAvaUsers=avaUsers;
 		counter.setNumber(reaction.count, animated);
 		TLRPC.TL_availableReaction aReaction=MediaDataController.getInstance(UserConfig.selectedAccount).getReaction(reaction.reaction);
 		if(aReaction!=null){
