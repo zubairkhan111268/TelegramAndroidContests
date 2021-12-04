@@ -32,8 +32,9 @@ public class MessageCellReactionsLayout extends ViewGroup{
 	private boolean inBubble;
 	private LayoutTransition layoutTransition;
 	private boolean hasUnknownUsers;
+	private ReactionButtonClickListener clickListener;
 
-	private ArrayList<MessageCellReactionButton> buttons=new ArrayList<>();
+	private ArrayList<MessageCellReactionButton> buttons=new ArrayList<>(), activeButtons=new ArrayList<>(), disappearingButtons=new ArrayList<>();
 
 //	private Paint paint=new Paint();
 
@@ -43,12 +44,16 @@ public class MessageCellReactionsLayout extends ViewGroup{
 //		setBackgroundColor(0x8800ff00);
 //		setWillNotDraw(false);
 		setPadding(AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10), AndroidUtilities.dp(10));
+		setClipToPadding(false);
 
 		layoutTransition=new LayoutTransition();
 		layoutTransition.setAnimateParentHierarchy(false);
 		layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
 		layoutTransition.setDuration(220);
 		layoutTransition.setInterpolator(LayoutTransition.CHANGING, CubicBezierInterpolator.DEFAULT);
+		layoutTransition.disableTransitionType(LayoutTransition.DISAPPEARING);
+		layoutTransition.setStartDelay(LayoutTransition.APPEARING, 0);
+		layoutTransition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
 
 		AnimatorSet set=new AnimatorSet();
 		set.playTogether(
@@ -57,14 +62,6 @@ public class MessageCellReactionsLayout extends ViewGroup{
 				ObjectAnimator.ofFloat(null, View.ALPHA, 0f, 1f)
 		);
 		layoutTransition.setAnimator(LayoutTransition.APPEARING, set);
-
-		set=new AnimatorSet();
-		set.playTogether(
-				ObjectAnimator.ofFloat(null, View.SCALE_X, 1f, .3f),
-				ObjectAnimator.ofFloat(null, View.SCALE_Y, 1f, .3f),
-				ObjectAnimator.ofFloat(null, View.ALPHA, 1f, 0f)
-		);
-		layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, set);
 	}
 
 	@Override
@@ -77,6 +74,8 @@ public class MessageCellReactionsLayout extends ViewGroup{
 
 		for(int i=0;i<getChildCount();i++){
 			View child=getChildAt(i);
+			if(disappearingButtons.contains(child))
+				continue;
 			child.measure(width | MeasureSpec.AT_MOST, rowHeight | MeasureSpec.EXACTLY);
 			if(curX+child.getMeasuredWidth()>width){
 				curX=getPaddingLeft();
@@ -111,11 +110,15 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			// go through all children and add up their widths
 			for(int i=0; i<getChildCount(); i++){
 				View child=getChildAt(i);
+				if(disappearingButtons.contains(child))
+					continue;
 				if(curX+child.getMeasuredWidth()>width){
 					// we have a completed row, go backwards and lay it out right to left
 					curX=r-l-getPaddingRight();
 					for(int j=i-1;j>=rowStart;j--){
 						View child2=getChildAt(j);
+						if(disappearingButtons.contains(child2))
+							continue;
 						child2.layout(curX-child2.getMeasuredWidth(), curY, curX, curY+child2.getMeasuredHeight());
 						curX-=child2.getMeasuredWidth()+gap;
 					}
@@ -129,12 +132,16 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			curX=r-l-getPaddingRight();
 			for(int j=getChildCount()-1;j>=rowStart;j--){
 				View child2=getChildAt(j);
+				if(disappearingButtons.contains(child2))
+					continue;
 				child2.layout(curX-child2.getMeasuredWidth(), curY, curX, curY+child2.getMeasuredHeight());
 				curX-=child2.getMeasuredWidth()+gap;
 			}
 		}else{
 			for(int i=0; i<getChildCount(); i++){
 				View child=getChildAt(i);
+				if(disappearingButtons.contains(child))
+					continue;
 				if(curX+child.getMeasuredWidth()>width){
 					curX=getPaddingLeft();
 					curY+=rowHeight+gap;
@@ -166,9 +173,8 @@ public class MessageCellReactionsLayout extends ViewGroup{
 		if(sameMessage){
 			if(getLayoutTransition()==null)
 				setLayoutTransition(layoutTransition);
-			HashMap<String, MessageCellReactionButton> existingButtons=new HashMap<>(getChildCount());
-			for(int i=0;i<getChildCount();i++){
-				MessageCellReactionButton btn=(MessageCellReactionButton) getChildAt(i);
+			HashMap<String, MessageCellReactionButton> existingButtons=new HashMap<>(activeButtons.size());
+			for(MessageCellReactionButton btn:activeButtons){
 				existingButtons.put(btn.getReaction().reaction, btn);
 			}
 			boolean finalShowAvatars=showAvatars;
@@ -195,9 +201,8 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			}
 		}else{
 			if(getLayoutTransition()!=null)
-					setLayoutTransition(null);
-			while(getChildCount()>0)
-				recycleButton((MessageCellReactionButton) getChildAt(getChildCount()-1));
+				setLayoutTransition(null);
+			clear();
 			if(!message.hasReactions())
 				return;
 			for(TLRPC.TL_reactionCount count : message.messageOwner.reactions.results){
@@ -208,6 +213,11 @@ public class MessageCellReactionsLayout extends ViewGroup{
 		}
 	}
 
+	public void clear(){
+		while(!activeButtons.isEmpty())
+			recycleButton(activeButtons.remove(activeButtons.size()-1));
+	}
+
 	private List<TLRPC.User> makeUserListForReaction(TLRPC.TL_reactionCount reaction, List<TLRPC.TL_messageUserReaction> recentReactions){
 		if(reaction.count>3 || recentReactions==null || recentReactions.isEmpty())
 			return null;
@@ -216,10 +226,10 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			if(r.reaction.equals(reaction.reaction)){
 				TLRPC.User user=MessagesController.getInstance(UserConfig.selectedAccount).getUser(r.user_id);
 				if(user!=null)
-					users.add(user);
+					users.add(0, user);
 				else
 					hasUnknownUsers=true;
-				if(users.size()==reaction.count)
+				if(users.size()==Math.min(3, reaction.count))
 					break;
 			}
 		}
@@ -230,21 +240,42 @@ public class MessageCellReactionsLayout extends ViewGroup{
 		if(!buttons.isEmpty()){
 			MessageCellReactionButton btn=buttons.remove(buttons.size()-1);
 			addView(btn);
+			activeButtons.add(btn);
 			btn.setForegroundColor(getColor(inBubble ? (message.isOutOwner() ? Theme.key_chat_outPreviewInstantText : Theme.key_chat_inPreviewInstantText) : Theme.key_chat_serviceText));
 			btn.setBackgroundType(inBubble, message.isOutOwner());
 			return btn;
 		}
 		MessageCellReactionButton btn=new MessageCellReactionButton(getContext(), resProvider);
 		addView(btn);
+		activeButtons.add(btn);
 		btn.setOnClickListener(this::onChildClick);
+		btn.setOnLongClickListener(this::onChildLongClick);
 		btn.setForegroundColor(getColor(inBubble ? (message.isOutOwner() ? Theme.key_chat_outPreviewInstantText : Theme.key_chat_inPreviewInstantText) : Theme.key_chat_serviceText));
 		btn.setBackgroundType(inBubble, message.isOutOwner());
 		return btn;
 	}
 
 	private void recycleButton(MessageCellReactionButton btn){
-		removeView(btn);
-		buttons.add(btn);
+		activeButtons.remove(btn);
+		if(getLayoutTransition()!=null){
+			disappearingButtons.add(btn);
+			btn.animate().scaleX(.3f).scaleY(.3f).alpha(0f).setDuration(220).withEndAction(()->{
+				removeView(btn);
+				disappearingButtons.remove(btn);
+				buttons.add(btn);
+				btn.setAlpha(1f);
+				btn.setScaleX(1f);
+				btn.setScaleY(1f);
+			}).start();
+		}else{
+			removeView(btn);
+			btn.animate().cancel();
+			btn.setScaleX(1f);
+			btn.setScaleY(1f);
+			btn.setAlpha(1f);
+			disappearingButtons.remove(btn);
+			buttons.add(btn);
+		}
 	}
 
 	public void setBottomRightIndentWidth(int bottomRightIndentWidth){
@@ -267,17 +298,16 @@ public class MessageCellReactionsLayout extends ViewGroup{
 
 	private void onChildClick(View v){
 		MessageCellReactionButton btn=(MessageCellReactionButton)v;
-		btn.getReaction().chosen=!btn.getReaction().chosen;
-		if(btn.getReaction().chosen)
-			btn.getReaction().count++;
-		else
-			btn.getReaction().count--;
-		((ChatMessageCell)getParent()).forceResetMessageObject();
+		clickListener.onReactionClick(btn);
+	}
+
+	private boolean onChildLongClick(View v){
+		MessageCellReactionButton btn=(MessageCellReactionButton) v;
+		return clickListener.onReactionLongClick(btn);
 	}
 
 	public boolean willHandleTouchEventBecauseOfFuckedUpCustomEventDispatch(MotionEvent ev){
-		for(int i=0;i<getChildCount();i++){
-			View child=getChildAt(i);
+		for(MessageCellReactionButton child:activeButtons){
 			rect.set(0, 0, child.getWidth(), child.getHeight());
 			rect.offset(getLeft()+child.getLeft(), getTop()+child.getTop());
 			if(rect.contains((int)ev.getX(), (int)ev.getY()))
@@ -287,12 +317,29 @@ public class MessageCellReactionsLayout extends ViewGroup{
 	}
 
 	public void invalidateButtons(){
-		for(int i=0;i<getChildCount();i++)
-			getChildAt(i).invalidate();
+		for(MessageCellReactionButton btn:activeButtons)
+			btn.invalidate();
+	}
+
+	public void setButtonClickListener(ReactionButtonClickListener clickListener){
+		this.clickListener=clickListener;
+	}
+
+	public MessageCellReactionButton getReactionButton(String reaction){
+		for(MessageCellReactionButton btn:activeButtons){
+			if(btn.getReaction().reaction.equals(reaction))
+				return btn;
+		}
+		return null;
 	}
 
 	private int getColor(String key){
 		Integer color=resProvider.getColor(key);
 		return color==null ? Theme.getColor(key) : color;
+	}
+
+	public interface ReactionButtonClickListener{
+		void onReactionClick(MessageCellReactionButton btn);
+		boolean onReactionLongClick(MessageCellReactionButton btn);
 	}
 }

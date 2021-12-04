@@ -92,7 +92,7 @@ import androidx.recyclerview.widget.GridLayoutManagerFixed;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-public class ChatMessagePopupMenu{
+public class ChatMessagePopupMenu implements ReactionChooserView.OnReactionClickListener{
 	private static final String TAG="ChatMessagePopupMenu";
 
 	private MessageObject selectedObject;
@@ -462,6 +462,7 @@ public class ChatMessagePopupMenu{
 			else
 				availableReactions=chatFull.available_reactions.stream().map(fragment.getMediaDataController()::getReaction).collect(Collectors.toList());
 			reactionChooserView=new ReactionChooserView(getParentActivity(), themeDelegate, availableReactions);
+			reactionChooserView.setOnReactionClickListener(this);
 			FrameLayout reactionsWrapper=new FrameLayout(getParentActivity());
 
 			menuWrapper.addView(reactionsWrapper, LayoutHelper.createLinear(276, 71, 0, 0, 0, -17));
@@ -1256,6 +1257,11 @@ public class ChatMessagePopupMenu{
 			whiteBg.setBackgroundColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
 	}
 
+	@Override
+	public void onReactionClick(String reaction, View view){
+		listener.onReactionSelected(reaction, view);
+	}
+
 	public enum Option{
 		RETRY,
 		DELETE,
@@ -1294,6 +1300,7 @@ public class ChatMessagePopupMenu{
 
 	public interface PopupMenuListener{
 		void onOptionSelected(Option option);
+		void onReactionSelected(String reaction, View button);
 		void onDismissed();
 	}
 

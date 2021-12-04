@@ -135,6 +135,7 @@ import org.telegram.ui.Components.URLSpanBrowser;
 import org.telegram.ui.Components.URLSpanMono;
 import org.telegram.ui.Components.URLSpanNoUnderline;
 import org.telegram.ui.Components.VideoForwardDrawable;
+import org.telegram.ui.Components.chat.MessageCellReactionButton;
 import org.telegram.ui.Components.chat.MessageCellReactionsLayout;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.PinchToZoomHelper;
@@ -148,7 +149,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Set;
 
-public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate, ImageReceiver.ImageReceiverDelegate, DownloadController.FileDownloadProgressListener, TextSelectionHelper.SelectableView {
+public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate, ImageReceiver.ImageReceiverDelegate, DownloadController.FileDownloadProgressListener, TextSelectionHelper.SelectableView, MessageCellReactionsLayout.ReactionButtonClickListener{
 
     public RadialProgress2 getRadialProgress() {
         return radialProgress;
@@ -211,7 +212,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         default void didPressBotButton(ChatMessageCell cell, TLRPC.KeyboardButton button) {
         }
 
-        default void didPressReaction(ChatMessageCell cell, TLRPC.TL_reactionCount reaction) {
+        default void didPressReaction(ChatMessageCell cell, TLRPC.TL_reactionCount reaction, MessageCellReactionButton button) {
+        }
+
+        default boolean didLongPressReaction(ChatMessageCell cell, TLRPC.TL_reactionCount reaction, MessageCellReactionButton button) {
+            return false;
         }
 
         default void didPressVoteButtons(ChatMessageCell cell, ArrayList<TLRPC.TL_pollAnswer> buttons, int showCount, int x, int y) {
@@ -302,7 +307,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         private int height;
         private StaticLayout title;
         private TLRPC.KeyboardButton button;
-        private TLRPC.TL_reactionCount reaction;
         private int angle;
         private float progressAlpha;
         private long lastUpdateTime;
@@ -904,6 +908,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         };
         roundVideoPlayingDrawable = new RoundVideoPlayingDrawable(this, resourcesProvider);
+        setClipChildren(false);
     }
 
     private void createPollUI() {
@@ -1620,7 +1625,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return null;
     }
 
-    private ChatMessageCell findSiblingReactionsCell(){
+    public ChatMessageCell findSiblingReactionsCell(){
         ViewGroup parent = (ViewGroup) getParent();
         for (int a = 0, N = parent.getChildCount(); a < N; a++) {
             View view = parent.getChildAt(a);
@@ -2065,8 +2070,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         BotButton button = botButtons.get(pressedBotButton);
                         if (button.button != null) {
                             delegate.didPressBotButton(this, button.button);
-                        } else if (button.reaction != null) {
-                            delegate.didPressReaction(this, button.reaction);
                         }
                     }
                     pressedBotButton = -1;
@@ -3187,8 +3190,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
             }
         }
-        if(reactionsChanged && !inLayout)
-            requestLayout();
         if (!groupChanged && groupedMessages != null) {
             MessageObject.GroupedMessagePosition newPosition;
             if (groupedMessages.messages.size() > 1) {
@@ -6017,12 +6018,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 keyboardHeight = 0;
             }
             commentButtonOffsetY=0;
-            if(reactionsLayout!=null)
-                removeView(reactionsLayout);
             if((messageObject.hasReactions() || (groupedMessages!=null && groupedMessages.hasReactions)) &&
                     (currentPosition==null || ((currentPosition.flags & MessageObject.POSITION_FLAG_BOTTOM)!=0 && (currentPosition.flags & MessageObject.POSITION_FLAG_RIGHT)!=0))){
-                if(reactionsLayout==null)
+                if(reactionsLayout==null){
                     reactionsLayout=new MessageCellReactionsLayout(getContext(), resourcesProvider);
+                    reactionsLayout.setButtonClickListener(this);
+                }
                 if(reactionsLayout.getParent()==null)
                     addView(reactionsLayout);
                 if(groupedMessages==null)
@@ -6069,6 +6070,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
 				}
 			}else if(reactionsLayout!=null && reactionsLayout.getParent()!=null){
+                reactionsLayout.clear();
                 removeView(reactionsLayout);
             }
             if (drawCommentButton) {
@@ -14589,8 +14591,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         if (delegate != null) {
                             if (button.button != null) {
                                 delegate.didPressBotButton(ChatMessageCell.this, button.button);
-                            } else if (button.reaction != null) {
-                                delegate.didPressReaction(ChatMessageCell.this, button.reaction);
                             }
                         }
                         sendAccessibilityEventForVirtualView(virtualViewId, AccessibilityEvent.TYPE_VIEW_CLICKED);
@@ -15271,5 +15271,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             return false;
         }
         return super.drawChild(canvas, child, drawingTime);
+    }
+
+    @Override
+    public void onReactionClick(MessageCellReactionButton btn){
+        if(delegate!=null)
+            delegate.didPressReaction(this, btn.getReaction(), btn);
+    }
+
+    @Override
+    public boolean onReactionLongClick(MessageCellReactionButton btn){
+        return delegate!=null && delegate.didLongPressReaction(this, btn.getReaction(), btn);
+    }
+
+    public MessageCellReactionsLayout getReactionsLayout(){
+        return reactionsLayout;
     }
 }

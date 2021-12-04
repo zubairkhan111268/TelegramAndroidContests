@@ -29,6 +29,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 	private HorizontalScrollView scrollView;
 	private LinearLayout imagesLayout;
 	private Random rand=new Random();
+	private OnReactionClickListener listener;
 
 	public ReactionChooserView(@NonNull Context context, Theme.ResourcesProvider theme, List<TLRPC.TL_availableReaction> availableReactions){
 		super(context);
@@ -60,8 +61,9 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 		for(TLRPC.TL_availableReaction reaction:availableReactions){
 			BackupImageView img=new BackupImageView(context);
 			img.setOnClickListener(this::onViewClick);
+			img.setTag(reaction.reaction);
 			img.getImageReceiver().setDelegate(this);
-			ReactionUtils.loadAnimationIntoImageView(reaction.select_animation, reaction, img);
+			ReactionUtils.loadAnimationIntoImageView(reaction.select_animation, reaction, img, 44);
 			imagesLayout.addView(img, LayoutHelper.createLinear(34, 34, 0, 0, 5, 0));
 		}
 		postDelayed(this::maybeRestartDrawables, 500);
@@ -76,7 +78,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 	}
 
 	private void onViewClick(View v){
-		RLottieDrawable drawable=((BackupImageView)v).getImageReceiver().getLottieAnimation();
+		listener.onReactionClick((String)v.getTag(), v);
 	}
 
 	@Override
@@ -121,6 +123,7 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 			if(img.getRight()<scrollX || img.getLeft()>scrollX+scrollW)
 				continue;
 
+			img.setPivotY(img.getHeight()/2f);
 			if(img.getLeft()<scrollX){
 				float part=(scrollX-img.getLeft())/(float)img.getWidth();
 				float scale=0.5f+0.5f*(1f-part);
@@ -138,5 +141,13 @@ public class ReactionChooserView extends LayoutIgnoringFrameLayout implements Im
 				img.setScaleY(1f);
 			}
 		}
+	}
+
+	public void setOnReactionClickListener(OnReactionClickListener l){
+		listener=l;
+	}
+
+	public interface OnReactionClickListener{
+		void onReactionClick(String reaction, View view);
 	}
 }

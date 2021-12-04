@@ -23,15 +23,16 @@ public class ReactionUtils{
 		}
 	}
 
-	public static void loadAnimationIntoImageView(TLRPC.Document document, Object parentObject, BackupImageView imageView){
+	public static void loadAnimationIntoImageView(TLRPC.Document document, Object parentObject, BackupImageView imageView, int size){
 		TLRPC.PhotoSize thumb = FileLoader.getClosestPhotoSizeWithSize(document.thumbs, 90);
 		SvgHelper.SvgDrawable svgThumb = DocumentObject.getSvgThumb(document, Theme.key_windowBackgroundGray, 1.0f);
+		String key=size+"_"+size;
 		if (svgThumb != null) {
-			imageView.setImage(ImageLocation.getForDocument(document), "80_80", null, svgThumb, parentObject);
+			imageView.getImageReceiver().setImage(ImageLocation.getForDocument(document), key, svgThumb, "tgs", parentObject, 1);
 		} else if (thumb != null) {
-			imageView.setImage(ImageLocation.getForDocument(document), "80_80", ImageLocation.getForDocument(thumb, document), null, 0, parentObject);
+			imageView.getImageReceiver().setImage(ImageLocation.getForDocument(document), key, ImageLocation.getForDocument(thumb, document), null, "tgs", parentObject, 1);
 		} else {
-			imageView.setImage(ImageLocation.getForDocument(document), "80_80", null, null, parentObject);
+			imageView.getImageReceiver().setImage(ImageLocation.getForDocument(document), key, null, "tgs", parentObject, 1);
 		}
 	}
 }

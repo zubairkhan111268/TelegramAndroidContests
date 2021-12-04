@@ -31,6 +31,8 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.NumberTextView;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import androidx.annotation.NonNull;
@@ -50,6 +52,7 @@ public class MessageCellReactionButton extends FrameLayout{
 	private TLRPC.TL_reactionCount reactions;
 	private AvatarsImageView avatarsView;
 	private Animator currentTransitionAnim;
+	private HashSet<Long> currentAvaUserIDs=new HashSet<>();
 
 	private static final Property<MessageCellReactionButton, Float> SELECTEDNESS_PROPERTY;
 
@@ -102,6 +105,10 @@ public class MessageCellReactionButton extends FrameLayout{
 
 	}
 
+	public BackupImageView getIcon(){
+		return icon;
+	}
+
 	public void setForegroundColor(int color){
 		counter.setTextColor(color);
 		paint.setColor(color);
@@ -140,6 +147,31 @@ public class MessageCellReactionButton extends FrameLayout{
 
 	public void setReactions(TLRPC.TL_reactionCount reaction, List<TLRPC.User> avaUsers, boolean animated){
 		boolean countChanged=reactions!=null && reactions.count!=reaction.count;
+		boolean avatarsChanged=false;
+		if(avaUsers==null)
+			avaUsers=Collections.emptyList();
+
+		if(avaUsers.size()!=currentAvaUserIDs.size()){
+			avatarsChanged=true;
+		}else{
+			for(TLRPC.User user:avaUsers){
+				if(!currentAvaUserIDs.contains(user.id)){
+					avatarsChanged=true;
+					break;
+				}
+			}
+		}
+
+		if(!countChanged && !avatarsChanged && reactions!=null && reactions.reaction.equals(reaction.reaction))
+			return;
+
+		if(avatarsChanged){
+			currentAvaUserIDs.clear();
+			for(TLRPC.User user:avaUsers){
+				currentAvaUserIDs.add(user.id);
+			}
+		}
+
 		reactions=reaction;
 		counter.setNumber(reaction.count, animated);
 		TLRPC.TL_availableReaction aReaction=MediaDataController.getInstance(UserConfig.selectedAccount).getReaction(reaction.reaction);
@@ -153,7 +185,7 @@ public class MessageCellReactionButton extends FrameLayout{
 			currentTransitionAnim.cancel();
 			currentTransitionAnim=null;
 		}
-		if(avaUsers!=null && !avaUsers.isEmpty()){
+		if(!avaUsers.isEmpty()){
 			boolean visibilityChanged=false;
 			if(avatarsView==null){
 				avatarsView=new AvatarsImageView(getContext(), false);
@@ -166,9 +198,6 @@ public class MessageCellReactionButton extends FrameLayout{
 			}
 			if(animated && visibilityChanged)
 				avatarsView.setAlpha(0f);
-			for(int i=0;i<3;i++){
-				avatarsView.setObject(2-i, UserConfig.selectedAccount, i<avaUsers.size() ? avaUsers.get(i) : null);
-			}
 			int offset=13*(3-avaUsers.size());
 			LayoutParams lp=(LayoutParams)avatarsView.getLayoutParams();
 			int newMargin=AndroidUtilities.dp(4+19-offset);
@@ -176,7 +205,12 @@ public class MessageCellReactionButton extends FrameLayout{
 				lp.leftMargin=newMargin;
 				requestLayout();
 			}
-			avatarsView.forceCommitTransition(animated);
+			if(avatarsChanged){
+				for(int i=0; i<3; i++){
+					avatarsView.setObject(2-i, UserConfig.selectedAccount, i<avaUsers.size() ? avaUsers.get(i) : null);
+				}
+				avatarsView.forceCommitTransition(animated);
+			}
 			int prevWidth=getWidth();
 			if(animated){
 				getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
