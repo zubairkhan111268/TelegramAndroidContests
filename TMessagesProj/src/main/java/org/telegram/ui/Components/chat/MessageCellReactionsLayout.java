@@ -68,6 +68,7 @@ public class MessageCellReactionsLayout extends ViewGroup{
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec){
 		int width=MeasureSpec.getSize(widthMeasureSpec)-getPaddingLeft()-getPaddingRight();
 		int curX=getPaddingLeft();
+		int maxX=0;
 		int gap=AndroidUtilities.dp(6);
 		int rowHeight=AndroidUtilities.dp(26);
 		int curY=0;
@@ -81,6 +82,7 @@ public class MessageCellReactionsLayout extends ViewGroup{
 				curX=getPaddingLeft();
 				curY+=rowHeight+gap;
 			}
+			maxX=Math.max(maxX, curX+child.getMeasuredWidth());
 			curX+=child.getMeasuredWidth()+gap;
 		}
 
@@ -90,7 +92,12 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			height+=AndroidUtilities.dp(20);
 		else
 			height+=getPaddingBottom();
-		setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height);
+
+		int measuredWidth=maxX+getPaddingRight();
+		if(curY==0)
+			measuredWidth+=bottomRightIndentWidth;
+
+		setMeasuredDimension(MeasureSpec.getMode(widthMeasureSpec)==MeasureSpec.EXACTLY ? MeasureSpec.getSize(widthMeasureSpec) : measuredWidth, height);
 	}
 
 	@Override

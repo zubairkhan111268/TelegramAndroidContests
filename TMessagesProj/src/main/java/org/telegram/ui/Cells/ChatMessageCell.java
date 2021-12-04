@@ -6038,7 +6038,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     keyboardHeight+=reactionsLayout.getMeasuredHeight();
                     substractBackgroundHeight+=reactionsLayout.getMeasuredHeight();
                 }else{
-                    int timeWidthTotal = timeWidth + (currentMessageObject.isOutOwner() ? AndroidUtilities.dp(20) : 0) + getExtraTimeX()+AndroidUtilities.dp(8);
+                    int timeWidthTotal=timeWidth+(currentMessageObject.isOutOwner() ? AndroidUtilities.dp(20) : 0)+getExtraTimeX()+AndroidUtilities.dp(8);
                     reactionsLayout.setBottomRightIndentWidth(timeWidthTotal);
 
                     int leftOffset=0, rightOffset=0;
@@ -6051,11 +6051,32 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
                     int bgLeft=getBackgroundDrawableLeft()+leftOffset;
                     int bgRight=getBackgroundDrawableRight()-rightOffset;
+                    int bgWidth=bgRight-bgLeft;
 
-                    if(groupedMessages!=null && !groupedMessages.isDocuments && currentPosition.spanSize<1000)
-                        reactionsLayout.measure((getGroupBackgroundWidth()-AndroidUtilities.dp(isAvatarVisible ? (25+48) : 25)) | MeasureSpec.EXACTLY, MeasureSpec.UNSPECIFIED);
-                    else
-                        reactionsLayout.measure((bgRight-bgLeft) | MeasureSpec.EXACTLY, MeasureSpec.UNSPECIFIED);
+
+                    if(groupedMessages!=null && !groupedMessages.isDocuments && currentPosition.spanSize<1000){
+                        reactionsLayout.measure((getGroupBackgroundWidth()-AndroidUtilities.dp(isAvatarVisible ? (25+48) : 25))|MeasureSpec.EXACTLY, MeasureSpec.UNSPECIFIED);
+                    }else{
+                        int maxWidth;
+                        if (drawAvatar) {
+                            if (AndroidUtilities.isTablet()) {
+                                maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(122);
+                            } else {
+                                maxWidth = Math.min(getParentWidth(), AndroidUtilities.displaySize.y) - AndroidUtilities.dp(122);
+                            }
+                        } else {
+                            if (AndroidUtilities.isTablet()) {
+                                maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(80);
+                            } else {
+                                maxWidth = Math.min(getParentWidth(), AndroidUtilities.displaySize.y) - AndroidUtilities.dp(80);
+                            }
+                        }
+                        int maxBgWidth=Math.min(AndroidUtilities.dp(250), maxWidth);
+                        reactionsLayout.measure(Math.max(maxBgWidth, bgWidth) | MeasureSpec.AT_MOST, MeasureSpec.UNSPECIFIED);
+                        if(reactionsLayout.getMeasuredWidth()>bgWidth){
+                            backgroundWidth+=reactionsLayout.getMeasuredWidth()-bgWidth;
+                        }
+                    }
                     totalHeight+=reactionsLayout.getMeasuredHeight();
                     if(hasNewLineForTime || drawInstantView){
                         totalHeight-=AndroidUtilities.dp(14);
