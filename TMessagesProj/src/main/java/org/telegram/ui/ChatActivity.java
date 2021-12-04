@@ -22176,7 +22176,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 					@Override
 					public boolean didLongPressReaction(ChatMessageCell cell, TLRPC.TL_reactionCount reaction, MessageCellReactionButton button){
                     	if(currentChat!=null && (!ChatObject.isChannelAndNotMegaGroup(currentChat) || !ChatObject.isChannel(currentChat)) && !(chatInfo.linked_chat_id!=0 && cell.getMessageObject().messageOwner.from_id.channel_id==chatInfo.linked_chat_id)){
-							currentReactionPopup=new SingleReactionPopupMenu(ChatActivity.this, cell.getMessageObject(), button);
+                    		MessageObject msg;
+                    		if(cell.getCurrentMessagesGroup()!=null)
+                    			msg=cell.getCurrentMessagesGroup().messages.get(0);
+                    		else
+                    			msg=cell.getMessageObject();
+							currentReactionPopup=new SingleReactionPopupMenu(ChatActivity.this, msg, button);
 							currentReactionPopup.setOnDismissAction(()->currentReactionPopup=null);
 							currentReactionPopup.show();
 							return true;
