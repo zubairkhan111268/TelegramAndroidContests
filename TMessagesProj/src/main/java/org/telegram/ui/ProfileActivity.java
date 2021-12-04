@@ -2716,6 +2716,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 Build.VERSION.SDK_INT >= 21 ? (SharedConfig.noStatusBar ? "Show status bar background" : "Hide status bar background") : null,
                                 BuildVars.DEBUG_PRIVATE_VERSION ? "Clean app update" : null,
                                 BuildVars.DEBUG_PRIVATE_VERSION ? "Reset suggestions" : null,
+                                SharedConfig.disableDoubleTapReactions ? "Enable double tap reactions" : "Disable double tap reactions",
                         };
                         builder.setItems(items, (dialog, which) -> {
                             if (which == 0) {
@@ -2786,6 +2787,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 suggestions.add("VALIDATE_PHONE_NUMBER");
                                 suggestions.add("VALIDATE_PASSWORD");
                                 getNotificationCenter().postNotificationName(NotificationCenter.newSuggestionsAvailable);
+                            }else if(which==17){
+                                SharedConfig.toggleDisableDoubleTapReactions();
                             }
                         });
                         builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);

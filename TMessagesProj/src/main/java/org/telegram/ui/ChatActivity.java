@@ -72,6 +72,7 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewTreeObserver;
@@ -784,7 +785,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     int dialogFolderId;
     int dialogFilterId;
 
-    private PinchToZoomHelper pinchToZoomHelper;
+	private float firstTapX, firstTapY;
+	private Runnable doubleTapDelayedAction;
+
+	private PinchToZoomHelper pinchToZoomHelper;
     private EmojiAnimationsOverlay emojiAnimationsOverlay;
 
     private interface ChatActivityDelegate {
@@ -1278,7 +1282,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 processRowSelect(view, outside, x, y);
                 return;
             }
-            createMenu(view, true, false, x, y);
+            onMessageTap(view, true, false, x, y, true);
         }
     };
 
@@ -19341,6 +19345,60 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         textSelectionHintWasShowed = false;
     }
 
+    private void onMessageTap(View v, boolean single, boolean listView, float x, float y, boolean searchGroup){
+		MessageObject message;
+		if (v instanceof ChatMessageCell) {
+			message = ((ChatMessageCell) v).getMessageObject();
+		} else if (v instanceof ChatActionCell) {
+			message = ((ChatActionCell) v).getMessageObject();
+		} else {
+			message = null;
+		}
+		if (message == null) {
+			return;
+		}
+		boolean canSendReactions=((currentUser!=null && currentEncryptedChat==null) || (chatInfo!=null && chatInfo.available_reactions!=null && !chatInfo.available_reactions.isEmpty())) &&
+				message.messageOwner.action==null && !message.scheduled && !message.isSponsored() && v instanceof ChatMessageCell;
+		if(canSendReactions && chatInfo!=null && !chatInfo.available_reactions.contains("❤") && !chatInfo.available_reactions.contains("👍"))
+			canSendReactions=false;
+		if(!canSendReactions || SharedConfig.disableDoubleTapReactions){
+			createMenu(v, single, listView, x, y, searchGroup);
+		}else if(doubleTapDelayedAction!=null){
+			chatListView.removeCallbacks(doubleTapDelayedAction);
+			doubleTapDelayedAction=null;
+			float distance=(float)Math.hypot(firstTapX-x, firstTapY-y);
+			if(distance<ViewConfiguration.get(getParentActivity()).getScaledDoubleTapSlop()){
+				if(message.messageOwner.reactions!=null){
+					for(TLRPC.TL_reactionCount rc : message.messageOwner.reactions.results){
+						if(rc.chosen){
+							removeReaction((ChatMessageCell)v);
+							return;
+						}
+					}
+				}
+				String reaction="❤";
+				if(chatInfo!=null && !chatInfo.available_reactions.contains(reaction))
+					reaction="👍";
+				int[] loc={0, 0};
+				v.getLocationOnScreen(loc);
+				int size=AndroidUtilities.dp(5);
+				int centerX=loc[0]+Math.round(x);
+				int centerY=loc[1]+Math.round(y);
+				sendReaction((ChatMessageCell)v, reaction, new Rect(centerX-size, centerY-size, centerX+size, centerY+size), null);
+			}else{
+				createMenu(v, single, listView, x, y, searchGroup);
+			}
+		}else{
+			doubleTapDelayedAction=()->{
+				createMenu(v, single, listView, x, y, searchGroup);
+				doubleTapDelayedAction=null;
+			};
+			firstTapX=x;
+			firstTapY=y;
+			chatListView.postDelayed(doubleTapDelayedAction, ViewConfiguration.getDoubleTapTimeout());
+		}
+	}
+
     private void createMenu(View v, boolean single, boolean listView, float x, float y) {
         createMenu(v, single, listView, x, y, true);
     }
@@ -21750,6 +21808,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 ChatMessageCell chatMessageCell = (ChatMessageCell) view;
                 chatMessageCell.setDelegate(new ChatMessageCell.ChatMessageCellDelegate() {
 
+
                     @Override
                     public void didPressHint(ChatMessageCell cell, int type) {
                         if (type == 0) {
@@ -21915,7 +21974,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                                 VoIPHelper.startCall(currentUser, messageObject.isVideoCall(), userInfo != null && userInfo.video_calls_available, getParentActivity(), getMessagesController().getUserFull(currentUser.id), getAccountInstance());
                             }
                         } else {
-                            createMenu(cell, true, false, otherX, otherY, messageObject.isMusic());
+							onMessageTap(cell, true, false, otherX, otherY, messageObject.isMusic());
                         }
                     }
 

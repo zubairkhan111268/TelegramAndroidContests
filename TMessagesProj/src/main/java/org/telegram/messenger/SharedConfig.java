@@ -120,6 +120,7 @@ public class SharedConfig {
     public static int messageSeenHintCount;
     public static int emojiInteractionsHintCount;
     public static int dayNightThemeSwitchHintCount;
+    public static boolean disableDoubleTapReactions;
 
     public static TLRPC.TL_help_appUpdate pendingAppUpdate;
     public static int pendingAppUpdateBuildVersion;
@@ -375,6 +376,7 @@ public class SharedConfig {
             dayNightThemeSwitchHintCount = preferences.getInt("dayNightThemeSwitchHintCount", 3);
             mediaColumnsCount = preferences.getInt("mediaColumnsCount", 3);
             fastScrollHintCount = preferences.getInt("fastScrollHintCount", 3);
+            disableDoubleTapReactions = preferences.getBoolean("disableDoubleTapReactions", false);
 
             preferences = ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE);
             showNotificationsForAllAccounts = preferences.getBoolean("AllAccounts", true);
@@ -923,6 +925,14 @@ public class SharedConfig {
         SharedPreferences preferences = MessagesController.getGlobalMainSettings();
         SharedPreferences.Editor editor = preferences.edit();
         editor.putBoolean("pauseMusicOnRecord", pauseMusicOnRecord);
+        editor.commit();
+    }
+
+    public static void toggleDisableDoubleTapReactions() {
+        disableDoubleTapReactions = !disableDoubleTapReactions;
+        SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("disableDoubleTapReactions", disableDoubleTapReactions);
         editor.commit();
     }
 
