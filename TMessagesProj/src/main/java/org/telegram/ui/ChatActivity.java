@@ -16066,7 +16066,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         }
     }
 
-    private void rotateMotionBackgroundDrawable() {
+    public void rotateMotionBackgroundDrawable() {
         Drawable wallpaper = themeDelegate.getWallpaperDrawable();
         if (fragmentView != null) {
             wallpaper = ((SizeNotifierFrameLayout) fragmentView).getBackgroundImage();
@@ -24983,6 +24983,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 			currentReactionAnimOverlay.dismiss();
 		}
 		MessageObject msg=cell.getMessageObject();
+		ChatMessageCell origCell=cell;
 		if(cell.getCurrentMessagesGroup()!=null){
 			msg=cell.getCurrentMessagesGroup().messages.get(0);
 			ChatMessageCell sibling=cell.findSiblingReactionsCell();
@@ -25031,11 +25032,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 			ur.user_id=getUserConfig().getClientUserId();
 			msg.messageOwner.reactions.recent_reactons.add(0, ur);
 		}
-		int position = chatListView.getChildAdapterPosition(cell);
-		cell.getMessageObject().forceUpdate=true;
-		if (position >= 0) {
-			chatAdapter.notifyItemChanged(position);
-		}
+		updateAffectedCellsForReaction(cell);
 		getSendMessagesHelper().sendReaction(msg, reaction, ChatActivity.this);
 		currentReactionAnimOverlay=new ReactionAnimationOverlay(this, cell, animFrom, reaction, startAction);
 		currentReactionAnimOverlay.setOnDismissedAction(()->{
@@ -25046,6 +25043,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
 	private void removeReaction(ChatMessageCell cell){
 		MessageObject msg=cell.getMessageObject();
+		ChatMessageCell origCell=cell;
 		if(cell.getCurrentMessagesGroup()!=null){
 			msg=cell.getCurrentMessagesGroup().messages.get(0);
 			ChatMessageCell sibling=cell.findSiblingReactionsCell();
@@ -25067,11 +25065,37 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 				break;
 			}
 		}
-		int position = chatListView.getChildAdapterPosition(cell);
-		cell.getMessageObject().forceUpdate=true;
-		if (position >= 0) {
-			chatAdapter.notifyItemChanged(position);
-		}
+		updateAffectedCellsForReaction(cell);
 		getSendMessagesHelper().sendReaction(msg, null, ChatActivity.this);
+	}
+
+	private void updateAffectedCellsForReaction(ChatMessageCell cell){
+    	if(cell.getCurrentMessagesGroup()!=null){
+    		MessageObject.GroupedMessages group=cell.getCurrentMessagesGroup();
+    		int minPosition=Integer.MAX_VALUE, maxPosition=0;
+    		for(int i=0;i<chatListView.getChildCount();i++){
+    			View v=chatListView.getChildAt(i);
+    			if(v instanceof ChatMessageCell){
+    				ChatMessageCell otherCell=(ChatMessageCell)v;
+    				if(otherCell.getCurrentMessagesGroup()==group){
+    					otherCell.getMessageObject().forceUpdate=true;
+    					otherCell.invalidate();
+    					int pos=chatListView.getChildAdapterPosition(otherCell);
+    					minPosition=Math.min(pos, minPosition);
+    					maxPosition=Math.max(pos, maxPosition);
+					}
+				}
+			}
+    		if(minPosition!=Integer.MAX_VALUE){
+    			chatAdapter.notifyItemRangeChanged(minPosition, maxPosition-minPosition);
+			}
+		}else{
+			int position=chatListView.getChildAdapterPosition(cell);
+			cell.getMessageObject().forceUpdate=true;
+			cell.invalidate();
+			if(position>=0){
+				chatAdapter.notifyItemChanged(position);
+			}
+		}
 	}
 }

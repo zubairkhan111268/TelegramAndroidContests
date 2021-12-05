@@ -18,6 +18,7 @@ import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.MessageObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.ChatActivity;
@@ -32,7 +33,7 @@ public class ReactionAnimationOverlay implements ImageReceiver.ImageReceiverDele
 
 	private ChatActivity abomination;
 	private ChatMessageCell cell;
-	private Rect animFrom, animTo;
+	private Rect animFrom, animTo=new Rect();
 	private String reaction;
 	private Runnable onDismissedAction, startAction;
 	private boolean dismissed;
@@ -102,20 +103,7 @@ public class ReactionAnimationOverlay implements ImageReceiver.ImageReceiverDele
 		}
 		RecyclerListView chatListView=abomination.getChatListView();
 		chatListView.addOnScrollListener(listScrollListener);
-		MessageCellReactionButton btn=cell.getReactionsLayout().getReactionButton(reaction);
-		animTo=new Rect();
-		if(btn!=null){
-			View icon=btn.getIcon();
-			int[] loc={0, 0};
-			btn.getLocationOnScreen(loc);
-			int x=Math.round(loc[0]+btn.getWidth()*btn.getScaleX()/2f)-btn.getWidth()/2;
-			int y=Math.round(loc[1]+btn.getHeight()*btn.getScaleY()/2f)-btn.getHeight()/2;
-			animTo.set(x+icon.getLeft(), y+icon.getTop(), x+icon.getRight(), y+icon.getBottom());
-
-		}else{
-			animTo.set(0, 0, AndroidUtilities.dp(20), AndroidUtilities.dp(20));
-			animTo.offset(activity.getResources().getDisplayMetrics().widthPixels/2-animTo.width()/2, activity.getResources().getDisplayMetrics().heightPixels/2-animTo.height()/2);
-		}
+		updateTargetBounds();
 		if(animFrom==null)
 			animFrom=animTo;
 
@@ -199,15 +187,8 @@ public class ReactionAnimationOverlay implements ImageReceiver.ImageReceiverDele
 	}
 
 	private void dismissAnimated(){
-		MessageCellReactionButton btn=cell.getReactionsLayout().getReactionButton(reaction);
-		if(btn!=null){
-			View icon=btn.getIcon();
-			int[] loc={0, 0};
-			btn.getLocationOnScreen(loc);
-			int x=Math.round(loc[0]+btn.getWidth()*btn.getScaleX()/2f)-btn.getWidth()/2;
-			int y=Math.round(loc[1]+btn.getHeight()*btn.getScaleY()/2f)-btn.getHeight()/2;
-			animTo.set(x+icon.getLeft(), y+icon.getTop(), x+icon.getRight(), y+icon.getBottom());
-		}
+		updateTargetBounds();
+		abomination.rotateMotionBackgroundDrawable();
 
 		float scale=Math.min(animTo.width(), animTo.height())/(float)smallAnimSize;
 		AnimatorSet set=new AnimatorSet();
@@ -228,5 +209,54 @@ public class ReactionAnimationOverlay implements ImageReceiver.ImageReceiverDele
 			}
 		});
 		set.start();
+	}
+
+	private void updateTargetBounds(){
+		MessageCellReactionsLayout reactionsLayout=cell.getReactionsLayout();
+		MessageCellReactionButton btn=reactionsLayout!=null ? reactionsLayout.getReactionButton(reaction) : null;
+		if(btn!=null){
+			View icon=btn.getIcon();
+			int[] loc={0, 0};
+			btn.getLocationOnScreen(loc);
+			int x=Math.round(loc[0]+btn.getWidth()*btn.getScaleX()/2f)-btn.getWidth()/2;
+			int y=Math.round(loc[1]+btn.getHeight()*btn.getScaleY()/2f)-btn.getHeight()/2;
+			animTo.set(x+icon.getLeft(), y+icon.getTop(), x+icon.getRight(), y+icon.getBottom());
+		}else if(abomination.getCurrentUser()!=null){
+			MessageObject reactionMsg=cell.getCurrentMessagesGroup()!=null ? cell.getCurrentMessagesGroup().messages.get(0) : cell.getMessageObject();
+			ChatMessageCell reactionsCell=cell.getCurrentMessagesGroup()!=null ? cell.findSiblingReactionsCell() : cell;
+			if(reactionsCell==null)
+				reactionsCell=cell;
+			int index=-1;
+			int i=0;
+			for(TLRPC.TL_messageUserReaction reaction:reactionMsg.messageOwner.reactions.recent_reactons){
+				if(reaction.user_id==abomination.getUserConfig().getClientUserId()){
+					index=i;
+					break;
+				}
+				i++;
+			}
+			ImageReceiver icon=index!=-1 ? reactionsCell.getPmReactionIcon(index) : null;
+			if(icon==null){
+				if(animTo.isEmpty()){
+					animTo.set(0, 0, AndroidUtilities.dp(20), AndroidUtilities.dp(20));
+					animTo.offset(activity.getResources().getDisplayMetrics().widthPixels/2-animTo.width()/2, activity.getResources().getDisplayMetrics().heightPixels/2-animTo.height()/2);
+				}
+				return;
+			}
+			int x=Math.round(icon.getImageX()), y=Math.round(icon.getImageY()), w=Math.round(icon.getImageWidth()), h=Math.round(icon.getImageHeight());
+			if(x==0 || y==0){
+				x=reactionsCell.getTimeX();
+				y=reactionsCell.getTimeY();
+				w=h=AndroidUtilities.dp(14);
+			}
+			int[] loc={0, 0};
+			reactionsCell.getLocationOnScreen(loc);
+			x+=loc[0];
+			y+=loc[1];
+			animTo.set(x, y, x+w, y+h);
+		}else if(animTo.isEmpty()){
+			animTo.set(0, 0, AndroidUtilities.dp(20), AndroidUtilities.dp(20));
+			animTo.offset(activity.getResources().getDisplayMetrics().widthPixels/2-animTo.width()/2, activity.getResources().getDisplayMetrics().heightPixels/2-animTo.height()/2);
+		}
 	}
 }

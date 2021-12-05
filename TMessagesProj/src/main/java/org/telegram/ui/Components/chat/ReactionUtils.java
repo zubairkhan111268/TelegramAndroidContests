@@ -3,6 +3,7 @@ package org.telegram.ui.Components.chat;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLocation;
+import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.SvgHelper;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
@@ -20,6 +21,20 @@ public class ReactionUtils{
 			}
 		} else {
 			imageView.setImage(ImageLocation.getForDocument(thumb, document), null, "webp", null, parentObject);
+		}
+	}
+
+	public static void loadWebpIntoImageReceiver(TLRPC.Document document, Object parentObject, ImageReceiver receiver){
+		TLRPC.PhotoSize thumb = FileLoader.getClosestPhotoSizeWithSize(document.thumbs, 90);
+		SvgHelper.SvgDrawable svgThumb = DocumentObject.getSvgThumb(document, Theme.key_windowBackgroundGray, 1.0f);
+		if (svgThumb != null) {
+			if (thumb != null) {
+				receiver.setImage(ImageLocation.getForDocument(thumb, document), null, svgThumb, "webp", parentObject, 1);
+			} else {
+				receiver.setImage(ImageLocation.getForDocument(document), null, svgThumb, "webp", parentObject, 1);
+			}
+		} else {
+			receiver.setImage(ImageLocation.getForDocument(thumb, document), null, null, "webp", parentObject, 1);
 		}
 	}
 

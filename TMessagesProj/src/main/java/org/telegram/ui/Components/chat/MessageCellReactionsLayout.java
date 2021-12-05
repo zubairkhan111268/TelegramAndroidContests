@@ -94,8 +94,12 @@ public class MessageCellReactionsLayout extends ViewGroup{
 			height+=getPaddingBottom();
 
 		int measuredWidth=maxX+getPaddingRight();
-		if(curY==0)
-			measuredWidth+=bottomRightIndentWidth;
+		if(curY==0){
+			if(measuredWidth+bottomRightIndentWidth<=MeasureSpec.getSize(widthMeasureSpec))
+				measuredWidth+=bottomRightIndentWidth;
+			else
+				height+=AndroidUtilities.dp(20)-getPaddingBottom();
+		}
 
 		setMeasuredDimension(MeasureSpec.getMode(widthMeasureSpec)==MeasureSpec.EXACTLY ? MeasureSpec.getSize(widthMeasureSpec) : measuredWidth, height);
 	}
@@ -164,18 +168,19 @@ public class MessageCellReactionsLayout extends ViewGroup{
 		this.message=message;
 		this.inBubble=inBubble;
 		hasUnknownUsers=false;
-		boolean showAvatars=true;
-		if(message.messageOwner.reactions.recent_reactons!=null && !message.messageOwner.reactions.recent_reactons.isEmpty()){
-			String avatarsReaction=message.messageOwner.reactions.recent_reactons.get(0).reaction;
-			for(TLRPC.TL_messageUserReaction reaction:message.messageOwner.reactions.recent_reactons){
-				if(!avatarsReaction.equals(reaction.reaction)){
-					showAvatars=false;
-					break;
-				}
-			}
-		}else{
-			showAvatars=false;
-		}
+//		boolean showAvatars=true;
+//		if(message.messageOwner.reactions.recent_reactons!=null && !message.messageOwner.reactions.recent_reactons.isEmpty()){
+//			String avatarsReaction=message.messageOwner.reactions.recent_reactons.get(0).reaction;
+//			for(TLRPC.TL_messageUserReaction reaction:message.messageOwner.reactions.recent_reactons){
+//				if(!avatarsReaction.equals(reaction.reaction)){
+//					showAvatars=false;
+//					break;
+//				}
+//			}
+//		}else{
+//			showAvatars=false;
+//		}
+		boolean showAvatars=message.messageOwner.reactions.results.size()==1;
 
 		if(sameMessage){
 			if(getLayoutTransition()==null)

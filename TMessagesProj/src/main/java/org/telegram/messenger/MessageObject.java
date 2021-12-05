@@ -2164,6 +2164,10 @@ public class MessageObject {
         return messageOwner.reactions != null && !messageOwner.reactions.results.isEmpty();
     }
 
+    public boolean hasRecentReactions(){
+        return hasReactions() && messageOwner.reactions.recent_reactons!=null && !messageOwner.reactions.recent_reactons.isEmpty();
+    }
+
     public int getAllReactionsCount(){
         if(hasReactions()){
             int total=0;
