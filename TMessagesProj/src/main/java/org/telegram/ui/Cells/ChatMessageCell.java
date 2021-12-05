@@ -6034,7 +6034,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             commentButtonOffsetY=0;
             boolean drawReactions=(messageObject.hasReactions() || (groupedMessages!=null && groupedMessages.hasReactions)) &&
                     (currentPosition==null || ((currentPosition.flags & MessageObject.POSITION_FLAG_BOTTOM)!=0 && (currentPosition.flags & MessageObject.POSITION_FLAG_RIGHT)!=0));
-            if(drawReactions && currentUser==null){
+            if(drawReactions && messageObject.getDialogId()<0){
                 if(reactionsLayout==null){
                     reactionsLayout=new MessageCellReactionsLayout(getContext(), resourcesProvider);
                     reactionsLayout.setButtonClickListener(this);
@@ -9772,7 +9772,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
         MessageObject reactionsMsg=currentMessagesGroup!=null ? currentMessagesGroup.messages.get(0) : messageObject;
-        if(DialogObject.isUserDialog(fromId) && !reactionsMsg.messageOwner.post && reactionsMsg.hasRecentReactions()){
+        if(reactionsMsg.getDialogId()>0 && reactionsMsg.hasRecentReactions()){
             int reactionsCount=Math.min(2, reactionsMsg.getAllReactionsCount());
             pmReactionsWidth=AndroidUtilities.dp(4+14*reactionsCount+4*(reactionsCount-1));
             timeWidth+=pmReactionsWidth;
