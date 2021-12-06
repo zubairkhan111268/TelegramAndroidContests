@@ -1099,9 +1099,9 @@ public class ChatMessagePopupMenu implements ReactionChooserView.OnReactionClick
 							RecyclerListView list=(RecyclerListView) reactionsPager.getChildAt(i);
 							String adapterType=((ReactionsViewRecyclerAdapter)list.getAdapter()).type;
 							if(Objects.equals(adapterType, type)){
-								list.getAdapter().notifyItemRangeChanged(prevCount, addedCount);
 								if(removedCount>0)
 									list.getAdapter().notifyItemRangeRemoved(list.getAdapter().getItemCount()-removedCount, removedCount);
+								list.getAdapter().notifyItemRangeChanged(prevCount, addedCount);
 							}else if(affectedTypes!=null && adapterType!=null && affectedTypes.contains(adapterType)){
 								list.getAdapter().notifyDataSetChanged();
 							}

@@ -143,7 +143,9 @@ public class ReactionAnimationEffectOverlay extends ReactionAnimationOverlay imp
 	}
 
 	private void dismissAnimated(){
-		updateTargetBounds();
+		try{
+			updateTargetBounds();
+		}catch(Exception ignore){}
 		abomination.rotateMotionBackgroundDrawable();
 
 		int[] loc={0, 0};

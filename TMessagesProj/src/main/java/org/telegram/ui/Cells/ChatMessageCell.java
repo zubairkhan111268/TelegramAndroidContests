@@ -6122,12 +6122,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
                 }
                 MessageObject reactionsMsg=groupedMessages!=null ? groupedMessages.messages.get(0) : messageObject;
-                for(int i=0;i<Math.min(pmReactionIcons.length, reactionsMsg.messageOwner.reactions.recent_reactons.size());i++){
-                    TLRPC.TL_availableReaction aReaction=MediaDataController.getInstance(currentAccount).getReaction(reactionsMsg.messageOwner.reactions.recent_reactons.get(i).reaction);
-                    if(aReaction!=null)
-                        ReactionUtils.loadWebpIntoImageReceiver(aReaction.static_icon, aReaction, pmReactionIcons[i]);
-                    else
-                        pmReactionIcons[i].clearImage();
+                if(reactionsMsg.messageOwner.reactions!=null){
+                    for(int i=0; i<Math.min(pmReactionIcons.length, reactionsMsg.messageOwner.reactions.recent_reactons.size()); i++){
+                        TLRPC.TL_availableReaction aReaction=MediaDataController.getInstance(currentAccount).getReaction(reactionsMsg.messageOwner.reactions.recent_reactons.get(i).reaction);
+                        if(aReaction!=null)
+                            ReactionUtils.loadWebpIntoImageReceiver(aReaction.static_icon, aReaction, pmReactionIcons[i]);
+                        else
+                            pmReactionIcons[i].clearImage();
+                    }
                 }
             }
             if (drawCommentButton) {

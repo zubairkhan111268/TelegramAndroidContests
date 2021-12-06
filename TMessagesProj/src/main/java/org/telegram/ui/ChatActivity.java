@@ -25000,6 +25000,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 					msg.messageOwner.reactions.results.remove(rc);
 				if(rc.reaction.equals(reaction)){
 					removeReaction(cell);
+					if(startAction!=null)
+						startAction.run();
 					return;
 				}
 				break;
