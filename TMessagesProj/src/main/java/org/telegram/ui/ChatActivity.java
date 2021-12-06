@@ -35,6 +35,7 @@ import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
@@ -60,7 +61,6 @@ import android.text.TextUtils;
 import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.URLSpan;
-import android.util.Log;
 import android.util.Property;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -76,7 +76,6 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewTreeObserver;
-import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
@@ -89,7 +88,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.collection.LongSparseArray;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.ChatListItemAnimator;
@@ -144,7 +142,6 @@ import org.telegram.ui.ActionBar.ActionBarLayout;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
-import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AdjustPanLayoutHelper;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
@@ -237,7 +234,9 @@ import org.telegram.ui.Components.UndoView;
 import org.telegram.ui.Components.ViewHelper;
 import org.telegram.ui.Components.chat.ChatMessagePopupMenu;
 import org.telegram.ui.Components.chat.MessageCellReactionButton;
+import org.telegram.ui.Components.chat.ReactionAnimationEffectOverlay;
 import org.telegram.ui.Components.chat.ReactionAnimationOverlay;
+import org.telegram.ui.Components.chat.ReactionAnimationSuperfluousEmojiFlyAwayOverlay;
 import org.telegram.ui.Components.chat.SingleReactionPopupMenu;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.Delegates.ChatActivityMemberRequestsDelegate;
@@ -24999,6 +24998,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 				rc.chosen=false;
 				if(rc.count==0)
 					msg.messageOwner.reactions.results.remove(rc);
+				if(rc.reaction.equals(reaction)){
+					removeReaction(cell);
+					return;
+				}
 				break;
 			}
 		}
@@ -25034,7 +25037,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 		}
 		updateAffectedCellsForReaction(cell);
 		getSendMessagesHelper().sendReaction(msg, reaction, ChatActivity.this);
-		currentReactionAnimOverlay=new ReactionAnimationOverlay(this, cell, animFrom, reaction, startAction);
+		currentReactionAnimOverlay=new ReactionAnimationEffectOverlay(this, cell, animFrom, reaction, startAction);
 		currentReactionAnimOverlay.setOnDismissedAction(()->{
 			currentReactionAnimOverlay=null;
 		});
@@ -25042,6 +25045,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 	}
 
 	private void removeReaction(ChatMessageCell cell){
+		if(currentReactionAnimOverlay!=null){
+			currentReactionAnimOverlay.dismiss();
+		}
 		MessageObject msg=cell.getMessageObject();
 		ChatMessageCell origCell=cell;
 		if(cell.getCurrentMessagesGroup()!=null){
@@ -25059,10 +25065,27 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 				break;
 			}
 		}
+		int i=0;
+		String reaction=null;
 		for(TLRPC.TL_messageUserReaction ur:msg.messageOwner.reactions.recent_reactons){
 			if(ur.user_id==getUserConfig().getClientUserId()){
 				msg.messageOwner.reactions.recent_reactons.remove(ur);
+				reaction=ur.reaction;
 				break;
+			}
+			i++;
+		}
+		if(currentUser!=null && Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP){
+			ImageReceiver receiver=cell.getPmReactionIcon(i);
+			if(receiver!=null){
+				int[] loc={0, 0};
+				cell.getLocationOnScreen(loc);
+				Point animFrom=new Point(Math.round(receiver.getCenterX())+loc[0], Math.round(receiver.getCenterY())+loc[1]);
+				currentReactionAnimOverlay=new ReactionAnimationSuperfluousEmojiFlyAwayOverlay(this, cell, reaction, animFrom);
+				currentReactionAnimOverlay.setOnDismissedAction(()->{
+					currentReactionAnimOverlay=null;
+				});
+				currentReactionAnimOverlay.show();
 			}
 		}
 		updateAffectedCellsForReaction(cell);
