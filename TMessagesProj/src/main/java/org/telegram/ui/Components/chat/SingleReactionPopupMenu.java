@@ -133,7 +133,7 @@ public class SingleReactionPopupMenu{
 				wrap.getViewTreeObserver().removeOnPreDrawListener(this);
 
 				if(upwards){
-					wrap.setTranslationY(loc[1]/*-AndroidUtilities.statusBarHeight*/+AndroidUtilities.dp(2f)-(shadowView.getHeight()+hole.getHeight()));
+					wrap.setTranslationY(loc[1]-AndroidUtilities.statusBarHeight-(shadowView.getHeight()));
 				}
 				int maxX=windowView.getWidth()-windowView.getPaddingLeft()-windowView.getPaddingRight()-wrap.getWidth();
 				int x=loc[0]-AndroidUtilities.dp(5)-windowView.getPaddingLeft();

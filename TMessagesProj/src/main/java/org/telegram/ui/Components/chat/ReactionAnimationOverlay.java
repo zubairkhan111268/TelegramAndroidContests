@@ -2,6 +2,7 @@ package org.telegram.ui.Components.chat;
 
 import android.app.Activity;
 import android.graphics.PixelFormat;
+import android.os.Build;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
@@ -63,7 +64,7 @@ public abstract class ReactionAnimationOverlay{
 		WindowManager.LayoutParams lp=new WindowManager.LayoutParams();
 		lp.width=lp.height=WindowManager.LayoutParams.MATCH_PARENT;
 		lp.type=WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
-		lp.flags=WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+		lp.flags=WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR;
 		lp.format=PixelFormat.TRANSLUCENT;
 		lp.token=chatListView.getWindowToken();
 		wm.addView(windowView, lp);

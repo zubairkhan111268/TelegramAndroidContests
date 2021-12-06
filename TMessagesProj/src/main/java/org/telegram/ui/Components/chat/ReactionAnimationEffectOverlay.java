@@ -71,6 +71,7 @@ public class ReactionAnimationEffectOverlay extends ReactionAnimationOverlay imp
 		smallAnimSize=bigAnimSize/2;
 
 		windowView=new FrameLayout(activity);
+		windowView.setClipChildren(false);
 		animationsWrap=new FrameLayout(activity);
 		windowView.addView(animationsWrap);
 		animationsWrap2=new FrameLayout(activity);
@@ -144,6 +145,13 @@ public class ReactionAnimationEffectOverlay extends ReactionAnimationOverlay imp
 	private void dismissAnimated(){
 		updateTargetBounds();
 		abomination.rotateMotionBackgroundDrawable();
+
+		int[] loc={0, 0};
+		animationsWrap2.getLocationOnScreen(loc);
+		if(loc[1]<-bigAnimSize || loc[1]>AndroidUtilities.displaySize.y){
+			dismiss();
+			return;
+		}
 
 		float scale=Math.min(animTo.width(), animTo.height())/(float)smallAnimSize;
 		AnimatorSet set=new AnimatorSet();

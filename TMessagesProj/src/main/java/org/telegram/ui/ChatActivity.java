@@ -25029,7 +25029,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 				break;
 			}
 		}
-		if(!found && msg.messageOwner.reactions.recent_reactons.size()<3){
+		if(!found && msg.messageOwner.reactions.recent_reactons.size()<3 && (currentChat==null || !ChatObject.isChannelAndNotMegaGroup(currentChat))){
 			TLRPC.TL_messageUserReaction ur=new TLRPC.TL_messageUserReaction();
 			ur.reaction=reaction;
 			ur.user_id=getUserConfig().getClientUserId();

@@ -1630,6 +1630,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     public ChatMessageCell findSiblingReactionsCell(){
         ViewGroup parent = (ViewGroup) getParent();
+        if(parent==null)
+            return null;
         for (int a = 0, N = parent.getChildCount(); a < N; a++) {
             View view = parent.getChildAt(a);
             if (view != this && view instanceof ChatMessageCell) {
