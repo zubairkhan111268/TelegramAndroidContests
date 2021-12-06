@@ -311,10 +311,10 @@ public class MediaDataController extends BaseController {
                             prefs.edit().putLong("reactionsLoadDate", reactionsLoadDate).putString("reactions", Base64.encodeToString(sd.toByteArray(), 0)).apply();
                         }catch(IOException ignore){}
                         for(TLRPC.TL_availableReaction reaction:res.reactions){
-                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.static_icon), reaction, null, 0, 1);
-                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.select_animation), reaction, null, 0, 1);
-                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.activate_animation), reaction, null, 0, 1);
-                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.effect_animation), reaction, null, 0, 1);
+                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.static_icon), reaction, "webp", 0, 1);
+                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.select_animation), reaction, "tgs", 0, 1);
+                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.activate_animation), reaction, "tgs", 0, 1);
+                            getFileLoader().loadFile(ImageLocation.getForDocument(reaction.effect_animation), reaction, "tgs", 0, 1);
                         }
                     }else{
                         prefs.edit().putLong("reactionsLoadDate", reactionsLoadDate).apply();
