@@ -114,6 +114,7 @@ public class ReactionAnimationEffectOverlay extends ReactionAnimationOverlay imp
 		imageReceiver.getLottieAnimation().setCurrentFrame(0, true);
 		if(numAnimationsReady==2)
 			bringItOn();
+		imageReceiver.setDelegate(null);
 	}
 
 	private void bringItOn(){

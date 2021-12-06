@@ -19568,7 +19568,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 return;
             }
 
-			if ((type>=0) || ((type==-1) && single && (selectedObject.isSending() || selectedObject.isEditing()) && (currentEncryptedChat==null))){
+			if ((type>=0) || ((type==-1) && single && (message.isSending() || message.isEditing()) && (currentEncryptedChat==null))){
 				selectedObject = message;
 				selectedObjectGroup = groupedMessages;
 			}

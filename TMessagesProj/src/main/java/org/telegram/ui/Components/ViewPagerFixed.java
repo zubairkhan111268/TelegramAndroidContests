@@ -560,6 +560,7 @@ public class ViewPagerFixed extends FrameLayout {
 				setEnabled(true);
                 onPageScrolled(1.0f);
 				invalidate();
+				doneAnimating();
 			}
 		});
 		tabsAnimator.start();
