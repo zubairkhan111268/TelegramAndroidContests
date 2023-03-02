@@ -103,7 +103,7 @@ public class BlobDrawable {
         if (SharedConfig.getLiteMode().enabled()) {
             return;
         }
-        path.reset();
+        path.rewind();
 
         for (int i = 0; i < N; i++) {
             float progress = this.progress[i];
@@ -202,5 +202,14 @@ public class BlobDrawable {
                 }
             }
         }
+    }
+
+    public boolean isCircle(){
+        float r=radius[0];
+        for(int i=1;i<N;i++){
+            if(r!=radius[i])
+                return false;
+        }
+        return true;
     }
 }

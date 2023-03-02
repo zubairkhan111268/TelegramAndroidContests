@@ -4049,6 +4049,7 @@
     <string name="VoipSwitchToVideoCall">Switch to video call?</string>
     <string name="VoipSwitch">SWITCH</string>
     <string name="VoipUserMicrophoneIsOff">%s\'s microphone is off</string>
+    <string name="VoipOwnMicrophoneIsOff">Your microphone is turned off</string>
     <string name="VoipUserCameraIsOff">%s\'s camera is off</string>
     <string name="AcceptCall">Accept</string>
     <string name="DeclineCall">Decline</string>
@@ -6255,4 +6256,9 @@
     <string name="ClearStorageHintTitle">Free up to **%s**</string>
     <string name="ClearStorageHintMessage">Clear storage space on your phone</string>
     <string name="YourCurrentPlan">your current plan</string>
+    <string name="VoipWeakNetwork">Weak network signal</string>
+    <string name="VoipEncryptionKeyTitle">This call is end-to-end encrypted</string>
+    <string name="VoipEncryptionKeyTooltip">Encryption key of this call</string>
+    <string name="VoipHideEmoji">Hide Emoji</string>
+    <string name="VoipRateTitle">Rate this call</string>
 </resources>

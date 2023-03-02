@@ -71,6 +71,7 @@ import android.telephony.TelephonyManager;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.util.LruCache;
 import android.view.KeyEvent;
 import android.view.View;
@@ -2668,9 +2669,9 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 									LocaleController.getString("VoipAudioRoutingSpeaker", R.string.VoipAudioRoutingSpeaker),
 									isHeadsetPlugged ? LocaleController.getString("VoipAudioRoutingHeadset", R.string.VoipAudioRoutingHeadset) : LocaleController.getString("VoipAudioRoutingEarpiece", R.string.VoipAudioRoutingEarpiece),
 									currentBluetoothDeviceName != null ? currentBluetoothDeviceName : LocaleController.getString("VoipAudioRoutingBluetooth", R.string.VoipAudioRoutingBluetooth)},
-							new int[]{R.drawable.calls_menu_speaker,
-									isHeadsetPlugged ? R.drawable.calls_menu_headset : R.drawable.calls_menu_phone,
-									R.drawable.calls_menu_bluetooth}, (dialog, which) -> {
+							new int[]{R.drawable.msg_call_speaker,
+									isHeadsetPlugged ? R.drawable.calls_menu_headset : R.drawable.msg_call_earpiece,
+									R.drawable.msg_call_bluetooth}, (dialog, which) -> {
 								if (getSharedInstance() == null) {
 									return;
 								}
@@ -3404,7 +3405,12 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 		}
 		
 		if (needRateCall || forceRating || finalState.isRatingSuggested) {
-			startRatingActivity();
+			VoIPFragment fragment=VoIPFragment.getInstance();
+			if(fragment!=null){
+				fragment.showRatingScreen(privateCall);
+			}else{
+				startRatingActivity();
+			}
 			needRateCall = false;
 		}
 		if (needSendDebugLog && finalState.debugLog != null) {
@@ -3696,6 +3702,9 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 				FileLog.d("proximity " + newIsNear);
 			}
 			isProximityNear = newIsNear;
+			for(StateListener l:stateListeners){
+				l.onProximitySensorChange(isProximityNear);
+			}
 			try {
 				if (isProximityNear) {
 					proximityWakelock.acquire();
@@ -4407,6 +4416,8 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 		default void onScreenOnChange(boolean screenOn) {
 
 		}
+
+		default void onProximitySensorChange(boolean isNear){}
 	}
 
 	public class CallConnection extends Connection {

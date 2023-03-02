@@ -71,6 +71,8 @@ import android.text.style.ClickableSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.util.DisplayMetrics;
+import android.util.FloatProperty;
+import android.util.Property;
 import android.util.StateSet;
 import android.util.TypedValue;
 import android.view.Display;
@@ -244,6 +246,8 @@ public class AndroidUtilities {
     public static Pattern BAD_CHARS_MESSAGE_LONG_PATTERN = null;
     private static Pattern singleTagPatter = null;
 
+    public static final Property<View, Float> VIEW_SCALE;
+
     static {
         try {
             final String GOOD_IRI_CHAR = "a-zA-Z0-9\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF";
@@ -271,6 +275,34 @@ public class AndroidUtilities {
                             + "(?:\\b|$)");
         } catch (Exception e) {
             FileLog.e(e);
+        }
+
+        if(Build.VERSION.SDK_INT>=24){
+            VIEW_SCALE=new FloatProperty<View>("scale"){
+                @Override
+                public void setValue(View object, float value){
+                    object.setScaleX(value);
+                    object.setScaleY(value);
+                }
+
+                @Override
+                public Float get(View object){
+                    return object.getScaleX();
+                }
+            };
+        }else{
+            VIEW_SCALE=new Property<View, Float>(Float.class, "scale"){
+                @Override
+                public Float get(View object){
+                    return object.getScaleX();
+                }
+
+                @Override
+                public void set(View object, Float value){
+                    object.setScaleX(value);
+                    object.setScaleY(value);
+                }
+            };
         }
     }
 

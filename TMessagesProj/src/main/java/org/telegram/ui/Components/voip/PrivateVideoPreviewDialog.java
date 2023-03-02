@@ -74,7 +74,7 @@ public abstract class PrivateVideoPreviewDialog extends FrameLayout implements V
 
     private boolean needScreencast;
 
-    public PrivateVideoPreviewDialog(Context context, boolean mic, boolean screencast) {
+    public PrivateVideoPreviewDialog(Context context, boolean mic, boolean screencast, boolean animateIn) {
         super(context);
 
         needScreencast = screencast;
@@ -192,7 +192,7 @@ public abstract class PrivateVideoPreviewDialog extends FrameLayout implements V
 
             @Override
             protected void onDraw(Canvas canvas) {
-                AndroidUtilities.rectTmp.set(0, 0, getMeasuredWidth(), getMeasuredHeight());
+                AndroidUtilities.rectTmp.set(0, 0, getWidth(), getHeight());
                 gradientPaint[currentPage].setAlpha(255);
                 canvas.drawRoundRect(AndroidUtilities.rectTmp, AndroidUtilities.dp(6), AndroidUtilities.dp(6), gradientPaint[currentPage]);
                 if (pageOffset > 0 && currentPage + 1 < gradientPaint.length) {
@@ -225,10 +225,9 @@ public abstract class PrivateVideoPreviewDialog extends FrameLayout implements V
             }
         });
 
-        addView(positiveButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 0, 0, 0, 64));
-
         titlesLayout = new LinearLayout(context);
         addView(titlesLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 64, Gravity.BOTTOM));
+        addView(positiveButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 0, 0, 0, 64));
 
         for (int a = 0; a < titles.length; a++) {
             titles[a] = new TextView(context);
@@ -250,9 +249,11 @@ public abstract class PrivateVideoPreviewDialog extends FrameLayout implements V
             titles[a].setOnClickListener(view -> viewPager.setCurrentItem(num, true));
         }
 
-        setAlpha(0);
-        setTranslationX(AndroidUtilities.dp(32));
-        animate().alpha(1f).translationX(0).setDuration(150).start();
+        if(animateIn){
+            setAlpha(0);
+            setTranslationX(AndroidUtilities.dp(32));
+            animate().alpha(1f).translationX(0).setDuration(150).start();
+        }
 
         setWillNotDraw(false);
 
@@ -497,6 +498,10 @@ public abstract class PrivateVideoPreviewDialog extends FrameLayout implements V
         if (VoIPService.getSharedInstance() != null) {
             textureView.renderer.setMirror(VoIPService.getSharedInstance().isFrontFaceCamera());
         }
+    }
+
+    public TextView getPositiveButton(){
+        return positiveButton;
     }
 
     private class Adapter extends PagerAdapter {

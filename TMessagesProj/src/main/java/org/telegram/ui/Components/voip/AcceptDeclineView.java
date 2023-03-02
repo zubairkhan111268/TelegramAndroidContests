@@ -51,37 +51,36 @@ public class AcceptDeclineView extends View {
 
     private int buttonWidth;
 
-    float smallRadius;
-    float bigRadius;
-    boolean expandSmallRadius = true;
-    boolean expandBigRadius = true;
+    private float smallRadius;
+    private float bigRadius;
+    private boolean expandSmallRadius = true;
+    private boolean expandBigRadius = true;
 
-    boolean startDrag;
-    boolean captured;
-    long capturedTime;
-    boolean leftDrag;
-    float startX;
-    float startY;
-    float touchSlop;
-    float leftOffsetX;
-    float rigthOffsetX;
-    float maxOffset;
+    private boolean startDrag;
+    private boolean captured;
+    private boolean leftDrag;
+    private float startX;
+    private float startY;
+    private float touchSlop;
+    private float leftOffsetX;
+    private float rigthOffsetX;
+    private float maxOffset;
 
-    Rect acceptRect = new Rect();
-    Rect declineRect = new Rect();
-    Animator leftAnimator;
-    Animator rightAnimator;
+    private Rect acceptRect = new Rect();
+    private Rect declineRect = new Rect();
+    private Animator leftAnimator;
+    private Animator rightAnimator;
 
-    Listener listener;
+    private Listener listener;
 
-    boolean retryMod;
-    Drawable rippleDrawable;
+    private boolean retryMod;
+    private Drawable rippleDrawable;
     private boolean screenWasWakeup;
-    Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    Drawable arrowDrawable;
+    private Drawable arrowDrawable;
 
-    float arrowProgress;
+    private float arrowProgress;
 
     public AcceptDeclineView(@NonNull Context context) {
         super(context);

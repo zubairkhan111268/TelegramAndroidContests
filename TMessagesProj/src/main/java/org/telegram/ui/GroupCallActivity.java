@@ -5220,7 +5220,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
                     if (voIPService != null) {
                         voIPService.createCaptureDevice(false);
                     }
-                    previewDialog = new PrivateVideoPreviewDialog(context, true, VoIPService.getSharedInstance().getVideoState(true) != Instance.VIDEO_STATE_ACTIVE) {
+                    previewDialog = new PrivateVideoPreviewDialog(context, true, VoIPService.getSharedInstance().getVideoState(true) != Instance.VIDEO_STATE_ACTIVE, true) {
                         @Override
                         public void onDismiss(boolean screencast, boolean apply) {
                             boolean showMicIcon = previewDialog.micEnabled;

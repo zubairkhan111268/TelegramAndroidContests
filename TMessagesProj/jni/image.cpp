@@ -1294,4 +1294,87 @@ JNIEXPORT void Java_org_telegram_messenger_Utilities_generateGradient(JNIEnv *en
     }
 }
 
+JNIEXPORT void Java_org_telegram_messenger_Utilities_generateBetterGradient(JNIEnv *env, jclass clazz, jobject bitmap, jfloatArray _points, jintArray _colors) {
+    if (!bitmap) {
+        return;
+    }
+
+    AndroidBitmapInfo info={0};
+    if(AndroidBitmap_getInfo(env, bitmap, &info)<0){
+        return;
+    }
+
+    uint8_t *pixels = nullptr;
+    if (AndroidBitmap_lockPixels(env, bitmap, (void **) &pixels) < 0) {
+        return;
+    }
+
+    uint32_t width=info.width;
+    uint32_t height=info.height;
+    uint32_t stride=info.stride;
+
+    std::vector<std::pair<float, float>> positions;
+    float *points=env->GetFloatArrayElements(_points, nullptr);
+    for(int i=0;i<4;i++){
+        positions.emplace_back(points[i*2], points[i*2+1]);
+    }
+    env->ReleaseFloatArrayElements(_points, points, JNI_ABORT);
+    float maxDistance=0;
+    for(int i=0;i<4;i++){
+        for(int j=0;j<4;j++){
+            if(i==j)
+                continue;
+            float distX=positions[i].first-positions[j].first;
+            float distY=positions[i].second-positions[j].second;
+            maxDistance=std::max(maxDistance, sqrtf(distX*distX+distY*distY));
+        }
+    }
+    maxDistance=std::max(maxDistance, 0.9f);
+
+    uint8_t *colorsInt = reinterpret_cast<uint8_t *>(env->GetIntArrayElements(_colors, nullptr));
+    float colors[16];
+    for(int i=0;i<16;i++){
+        colors[i]=colorsInt[i]/255.0f;
+    }
+    env->ReleaseIntArrayElements(_colors, (jint *) colorsInt, JNI_ABORT);
+    int32_t colorsCount = 4;
+
+    for (int y = 0; y < height; y++) {
+        uint32_t offset = y * stride;
+        float pixelY=y/(float)height;
+        for (int x = 0; x < width; x++) {
+            float pixelX;
+            pixelX=x/(float)width;
+
+            float distanceSum = 0.0f;
+
+            float r = 0.0f;
+            float g = 0.0f;
+            float b = 0.0f;
+
+            for (int i = 0; i < colorsCount; i++) {
+                float colorX = positions[i].first;
+                float colorY = positions[i].second;
+
+                float distanceX = pixelX - colorX;
+                float distanceY = pixelY - colorY;
+
+                float distance = std::max(0.0f, maxDistance - sqrtf(distanceX * distanceX + distanceY * distanceY));
+                distance = distance * distance * distance * distance;
+                distanceSum += distance;
+
+                r = r + distance * colors[i * 4];
+                g = g + distance * colors[i * 4 + 1];
+                b = b + distance * colors[i * 4 + 2];
+            }
+
+            pixels[offset + x * 4] = (uint8_t) (b / distanceSum * 255.0f);
+            pixels[offset + x * 4 + 1] = (uint8_t) (g / distanceSum * 255.0f);
+            pixels[offset + x * 4 + 2] = (uint8_t) (r / distanceSum * 255.0f);
+            pixels[offset + x * 4 + 3] = 0xff;
+        }
+    }
+
+    AndroidBitmap_unlockPixels(env, bitmap);
+}
 }

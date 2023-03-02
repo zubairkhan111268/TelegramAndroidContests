@@ -2,6 +2,8 @@ package org.telegram.ui.Components.voip;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
@@ -22,13 +24,20 @@ import org.telegram.ui.VoIPFragment;
 
 public class VoIPWindowView extends FrameLayout {
 
-    Activity activity;
+    private Activity activity;
     protected boolean lockOnScreen;
 
     private int orientationBefore;
     private int animationIndex = -1;
 
-    VelocityTracker velocityTracker;
+    private VelocityTracker velocityTracker;
+
+    private boolean runEnterTransition;
+    private boolean finished;
+
+    private float startX;
+    private float startY;
+    private boolean startDragging;
 
     public VoIPWindowView(Activity activity, boolean enterAnimation) {
         super(activity);
@@ -42,9 +51,6 @@ public class VoIPWindowView extends FrameLayout {
             runEnterTransition = true;
         }
     }
-
-    boolean runEnterTransition;
-    boolean finished;
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -60,10 +66,6 @@ public class VoIPWindowView extends FrameLayout {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         return onTouchEvent(ev);
     }
-
-    float startX;
-    float startY;
-    boolean startDragging;
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -161,8 +163,13 @@ public class VoIPWindowView extends FrameLayout {
 
     public void startEnterTransition() {
         if (!lockOnScreen) {
-            setTranslationX(getMeasuredWidth());
-            animate().translationX(0).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
+            AnimatorSet anim=new AnimatorSet();
+            ObjectAnimator alpha=ObjectAnimator.ofFloat(this, View.ALPHA, 0, 1).setDuration(166);
+            alpha.setInterpolator(new CubicBezierInterpolator(0.33, 0.00, 0.67, 1.00));
+            ObjectAnimator transY=ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, AndroidUtilities.dp(120), 0).setDuration(433);
+            transY.setInterpolator(new CubicBezierInterpolator(0.33, 0.00, 0.04, 1.00));
+            anim.playTogether(alpha, transY);
+            anim.start();
         }
     }
 

@@ -4,10 +4,9 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
-import android.graphics.Color;
-import android.os.Build;
+import android.graphics.drawable.Drawable;
+import android.text.TextUtils;
 import android.transition.ChangeBounds;
-import android.transition.Fade;
 import android.transition.TransitionManager;
 import android.transition.TransitionSet;
 import android.transition.TransitionValues;
@@ -17,13 +16,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
+import android.view.animation.LinearInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
-import androidx.annotation.NonNull;
-import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
@@ -35,65 +30,90 @@ import java.util.HashMap;
 
 public class VoIPNotificationsLayout extends LinearLayout {
 
-    HashMap<String, NotificationView> viewsByTag = new HashMap<>();
-    ArrayList<NotificationView> viewToAdd = new ArrayList<>();
-    ArrayList<NotificationView> viewToRemove = new ArrayList<>();
-    TransitionSet transitionSet;
-    boolean lockAnimation;
-    boolean wasChanged;
-    Runnable onViewsUpdated;
+    private HashMap<String, TextView> viewsByTag = new HashMap<>();
+    private ArrayList<TextView> viewToAdd = new ArrayList<>();
+    private ArrayList<TextView> viewToRemove = new ArrayList<>();
+    private TransitionSet transitionSet;
+    private boolean lockAnimation;
+    private boolean wasChanged;
+    private Runnable onViewsUpdated;
+    private GradientBackgroundFrameLayout gradientLayout;
+    private boolean isVideo;
 
-    public VoIPNotificationsLayout(Context context) {
+    public VoIPNotificationsLayout(Context context, GradientBackgroundFrameLayout gradientLayout) {
         super(context);
+        this.gradientLayout=gradientLayout;
         setOrientation(VERTICAL);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            transitionSet = new TransitionSet();
-            transitionSet.addTransition(new Fade(Fade.OUT).setDuration(150))
-                    .addTransition(new ChangeBounds().setDuration(200))
-                    .addTransition(new Visibility() {
-                        @Override
-                        public Animator onAppear(ViewGroup sceneRoot, View view, TransitionValues startValues, TransitionValues endValues) {
-                            AnimatorSet set = new AnimatorSet();
-                            view.setAlpha(0);
-                            set.playTogether(
-                                    ObjectAnimator.ofFloat(view, View.ALPHA, 0, 1f),
-                                    ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, view.getMeasuredHeight(), 0)
-                            );
+        transitionSet = new TransitionSet();
+        transitionSet.addTransition(new ChangeBounds().setDuration(200))
+                .addTransition(new Visibility() {
+                    @Override
+                    public Animator onAppear(ViewGroup sceneRoot, View view, TransitionValues startValues, TransitionValues endValues) {
+                        AnimatorSet set = new AnimatorSet();
+                        ObjectAnimator scale1=ObjectAnimator.ofFloat(view, AndroidUtilities.VIEW_SCALE, 0.4f, 1.02f);
+                        scale1.setInterpolator(new CubicBezierInterpolator(0.48, 0.00, 0.35, 0.59));
+                        scale1.setDuration(200);
 
-                            set.setInterpolator(CubicBezierInterpolator.DEFAULT);
+                        ObjectAnimator scale2=ObjectAnimator.ofFloat(view, AndroidUtilities.VIEW_SCALE, 1f);
+                        scale2.setInterpolator(new CubicBezierInterpolator(0.25, -3.26, 0.57, 1.00));
+                        scale2.setDuration(133);
 
-                            return set;
-                        }
-                    }.setDuration(200));
-            transitionSet.setOrdering(TransitionSet.ORDERING_TOGETHER);
-        }
+                        ObjectAnimator alpha=ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f).setDuration(100);
+                        alpha.setInterpolator(new LinearInterpolator());
+
+                        AnimatorSet scale=new AnimatorSet();
+                        scale.playSequentially(scale1, scale2);
+                        set.playTogether(scale, alpha);
+
+                        return set;
+                    }
+
+                    @Override
+                    public Animator onDisappear(ViewGroup sceneRoot, View view, TransitionValues startValues, TransitionValues endValues){
+                        ObjectAnimator scale=ObjectAnimator.ofFloat(view, AndroidUtilities.VIEW_SCALE, 0.7f).setDuration(250);
+                        scale.setInterpolator(new CubicBezierInterpolator(0.17, 0.00, 0.18, 1.00));
+                        ObjectAnimator alpha=ObjectAnimator.ofFloat(view, View.ALPHA, 0f).setDuration(83);
+                        alpha.setInterpolator(new LinearInterpolator());
+                        AnimatorSet set=new AnimatorSet();
+                        set.playTogether(scale, alpha);
+                        return set;
+                    }
+                }.setDuration(200));
+        transitionSet.setOrdering(TransitionSet.ORDERING_TOGETHER);
     }
 
-    public void addNotification(int iconRes, String text, String tag, boolean animated) {
+    public void addNotification(String text, String tag, boolean animated) {
         if (viewsByTag.get(tag) != null) {
             return;
         }
 
-        NotificationView view = new NotificationView(getContext());
-        view.tag = tag;
-        view.iconView.setImageResource(iconRes);
-        view.textView.setText(text);
+        TextView view=new TextView(getContext());
+        view.setSingleLine();
+        view.setEllipsize(TextUtils.TruncateAt.END);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        view.setTextColor(0xffffffff);
+        view.setText(text);
+        view.setTag(tag);
+        view.setGravity(Gravity.CENTER);
+        int pad=AndroidUtilities.dp(12);
+        view.setPadding(pad, 0, pad, 0);
+        view.setBackground(getBackgroundDrawableForView(view));
         viewsByTag.put(tag, view);
 
-        if (animated) {
-            view.startAnimation();
-        }
+//        if (animated) {
+//            view.startAnimation();
+//        }
         if (lockAnimation) {
             viewToAdd.add(view);
         } else {
             wasChanged = true;
-            addView(view, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 0, 0, 4));
+            addView(view, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 24, Gravity.CENTER_HORIZONTAL, 4, 0, 0, 4));
         }
     }
 
     public void removeNotification(String tag) {
-        NotificationView view = viewsByTag.remove(tag);
+        TextView view = viewsByTag.remove(tag);
         if (view != null) {
             if (lockAnimation) {
                 if (viewToAdd.remove(view)) {
@@ -103,6 +123,7 @@ public class VoIPNotificationsLayout extends LinearLayout {
             } else {
                 wasChanged = true;
                 removeView(view);
+                gradientLayout.unregisterChild(view);
             }
         }
     }
@@ -119,17 +140,15 @@ public class VoIPNotificationsLayout extends LinearLayout {
         if (viewToAdd.isEmpty() && viewToRemove.isEmpty()) {
             return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            ViewParent parent = getParent();
-            if (parent != null) {
-                TransitionManager.beginDelayedTransition(this, transitionSet);
-            }
+        ViewParent parent = getParent();
+        if (parent != null) {
+            TransitionManager.beginDelayedTransition(this, transitionSet);
         }
 
         for (int i = 0; i < viewToAdd.size(); i++) {
-            NotificationView view = viewToAdd.get(i);
+            TextView view = viewToAdd.get(i);
             for (int j = 0; j < viewToRemove.size(); j++) {
-                if (view.tag.equals(viewToRemove.get(j).tag)) {
+                if (view.getTag().equals(viewToRemove.get(j).getTag())) {
                     viewToAdd.remove(i);
                     viewToRemove.remove(j);
                     i--;
@@ -139,15 +158,16 @@ public class VoIPNotificationsLayout extends LinearLayout {
         }
 
         for (int i = 0; i < viewToAdd.size(); i++) {
-            addView(viewToAdd.get(i), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 0, 0, 4));
+            addView(viewToAdd.get(i), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 24, Gravity.CENTER_HORIZONTAL, 4, 0, 0, 4));
         }
         for (int i = 0; i < viewToRemove.size(); i++) {
             removeView(viewToRemove.get(i));
+            gradientLayout.unregisterChild(viewToRemove.get(i));
         }
         viewsByTag.clear();
         for (int i = 0; i < getChildCount(); i++) {
-            NotificationView v = (NotificationView) getChildAt(i);
-            viewsByTag.put(v.tag, v);
+            TextView v = (TextView) getChildAt(i);
+            viewsByTag.put((String)v.getTag(), v);
         }
         viewToAdd.clear();
         viewToRemove.clear();
@@ -160,11 +180,9 @@ public class VoIPNotificationsLayout extends LinearLayout {
     public void beforeLayoutChanges() {
         wasChanged = false;
         if (!lockAnimation) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                ViewParent parent = getParent();
-                if (parent != null) {
-                    TransitionManager.beginDelayedTransition(this, transitionSet);
-                }
+            ViewParent parent = getParent();
+            if (parent != null) {
+                TransitionManager.beginDelayedTransition(this, transitionSet);
             }
         }
     }
@@ -181,48 +199,29 @@ public class VoIPNotificationsLayout extends LinearLayout {
         return (n > 0 ? AndroidUtilities.dp(16) : 0) + n * AndroidUtilities.dp(32);
     }
 
-    private static class NotificationView extends FrameLayout {
+    public void setOnViewsUpdated(Runnable onViewsUpdated) {
+        this.onViewsUpdated = onViewsUpdated;
+    }
 
-        public String tag;
-        ImageView iconView;
-        TextView textView;
+    public void setIsVideo(boolean isVideo){
+        if(this.isVideo==isVideo)
+            return;
 
-        public NotificationView(@NonNull Context context) {
-            super(context);
-            setFocusable(true);
-            setFocusableInTouchMode(true);
-
-            iconView = new ImageView(context);
-            setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16), ColorUtils.setAlphaComponent(Color.BLACK, (int) (255 * 0.4f))));
-            addView(iconView, LayoutHelper.createFrame(24, 24, 0, 10, 4, 10, 4));
-
-            textView = new TextView(context);
-            textView.setTextColor(Color.WHITE);
-            textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 44, 4, 16, 4));
-        }
-
-        public void startAnimation() {
-            textView.setVisibility(View.GONE);
-            postDelayed(() -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    TransitionSet transitionSet = new TransitionSet();
-                    transitionSet.
-                            addTransition(new Fade(Fade.IN).setDuration(150))
-                            .addTransition(new ChangeBounds().setDuration(200));
-                    transitionSet.setOrdering(TransitionSet.ORDERING_TOGETHER);
-                    ViewParent parent = getParent();
-                    if (parent != null) {
-                        TransitionManager.beginDelayedTransition((ViewGroup) parent, transitionSet);
-                    }
-                }
-
-                textView.setVisibility(View.VISIBLE);
-            }, 400);
+        this.isVideo=isVideo;
+        for(int i=0;i<getChildCount();i++){
+            View v=getChildAt(i);
+            gradientLayout.unregisterChild(v);
+            v.setBackground(getBackgroundDrawableForView(v));
         }
     }
 
-    public void setOnViewsUpdated(Runnable onViewsUpdated) {
-        this.onViewsUpdated = onViewsUpdated;
+    private Drawable getBackgroundDrawableForView(View v){
+        if(isVideo){
+            return Theme.createRoundRectDrawable(AndroidUtilities.dp(12), 0x64000000);
+        }else{
+            Drawable bg=gradientLayout.newChildBackgroundDrawable(v, true, 12);
+            bg.setAlpha(180);
+            return bg;
+        }
     }
 }
